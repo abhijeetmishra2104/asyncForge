@@ -4,16 +4,13 @@
 > processing system built with Next.js, PostgreSQL, RabbitMQ, and
 > Groq.**
 
-```{=html}
-<p align="center">
-```
-`<strong>`{=html}Accept fast · Queue reliably · Process asynchronously ·
-Recover from failure`</strong>`{=html}
-```{=html}
-</p>
-```
+# ⚡ AsyncForge
 
-------------------------------------------------------------------------
+> **A fault-tolerant, horizontally scalable asynchronous AI task processing system built with Next.js, PostgreSQL, RabbitMQ, and Groq.**
+
+### ⚡ Accept Fast · 📦 Queue Reliably · ⚙️ Process Asynchronously · 🛡️ Recover From Failure
+
+---
 
 ## 🚀 What is AsyncForge?
 
@@ -770,12 +767,10 @@ They were:
 
 > *Where is the source of truth when multiple systems coordinate?*
 
-```{=html}
-<p align="center">
-```
-`<strong>`{=html}Built to understand queues, failure, retries,
-idempotency, transactional outbox, and horizontal scaling by actually
-implementing them.`</strong>`{=html}
-```{=html}
-</p>
-```
+---
+
+> **AsyncForge was built to understand queues, failure, retries, idempotency, transactional outbox, and horizontal scaling by actually implementing them.**
+
+⚡ **Built for failure. Designed to scale.**
+
+---
