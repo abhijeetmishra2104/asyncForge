@@ -1,4 +1,8 @@
 import { z } from "zod";
+import { config } from "dotenv";
+
+// Load environment variables from the .env file into process.env
+config();
 
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
