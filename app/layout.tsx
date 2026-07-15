@@ -19,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         <footer className="border-t-4 border-black bg-white p-6 mt-12 text-center font-bold">
-          <p>Built with ☕️ by Abhijeet Mishra</p>
+          <p>&copy; {new Date().getFullYear()} Built by Abhijeet Mishra. All rights reserved.</p>
         </footer>
       </body>
     </html>
