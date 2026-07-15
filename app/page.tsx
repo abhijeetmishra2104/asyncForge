@@ -1,61 +1,78 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function Home() {
-  const [prompt, setPrompt] = useState("");
-  const [loading, setLoading] = useState(false);
+export default function LandingPage() {
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      router.push(`/jobs/${data.jobId}`);
-    } else {
-      alert("Failed to submit task");
-      setLoading(false);
-    }
-  };
-
   return (
-    <main className="max-w-3xl mx-auto p-8">
-      <h1 className="text-3xl font-bold mb-4">AsyncForge</h1>
-      <p className="text-gray-600 mb-8">
-        Fault-Tolerant Distributed AI Task Processing System. Decoupling HTTP requests from heavy AI workloads.
-      </p>
+    <main className="max-w-5xl mx-auto p-8 space-y-16 mt-8">
       
-      <div className="bg-gray-100 p-4 rounded-md mb-8 text-sm text-gray-700 flex items-center justify-between">
-        <span>Accepted</span> ➔ <span>Queued</span> ➔ <span>Processing</span> ➔ <span>Completed</span>
-      </div>
+      {/* Hero Section */}
+      <section className="space-y-6 text-center max-w-4xl mx-auto">
+        <h1 className="text-6xl md:text-7xl font-black tracking-tighter leading-tight">
+          Where AI workloads <br />
+          <span className="bg-[#ffe900] px-4 border-4 border-black inline-block shadow-[6px_6px_0px_0px_#000] -rotate-1 mt-2">
+            actually finish.
+          </span>
+        </h1>
+        <p className="text-xl font-medium max-w-2xl mx-auto mt-6">
+          No timeouts. No dropped connections. Just a fault-tolerant, asynchronous distributed pipeline for heavy LLM operations.
+        </p>
+      </section>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          className="w-full p-4 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500"
-          rows={5}
-          placeholder="e.g., Plan the backend architecture for a scalable notification system..."
-          required
-          minLength={10}
-        />
-        <button
-          type="submit"
-          disabled={loading || prompt.length < 10}
-          className="bg-blue-600 text-white px-6 py-2 rounded-md disabled:bg-blue-300 transition-colors"
+      {/* Problem & Solution Split */}
+      <section className="grid md:grid-cols-2 gap-8">
+        <div className="bg-[#ff90e8] border-4 border-black p-8 shadow-[8px_8px_0px_0px_#000]">
+          <div className="bg-black text-white text-sm font-bold inline-block px-3 py-1 mb-4">THE PROBLEM</div>
+          <h2 className="text-3xl font-black mb-4">Synchronous HTTP Kills AI.</h2>
+          <p className="font-medium text-lg leading-relaxed">
+            When you build vehicle damage detection pipelines or advanced reasoning agents, LLMs take 10-30 seconds to respond. Standard HTTP requests time out, the connection dies, and the user gets a generic 500 error while the job is lost forever.
+          </p>
+        </div>
+
+        <div className="bg-[#00f0ff] border-4 border-black p-8 shadow-[8px_8px_0px_0px_#000]">
+          <div className="bg-black text-white text-sm font-bold inline-block px-3 py-1 mb-4">THE SOLUTION</div>
+          <h2 className="text-3xl font-black mb-4">Decouple the Workload.</h2>
+          <p className="font-medium text-lg leading-relaxed">
+            We return a <span className="bg-white px-2 py-0.5 border-2 border-black">202 Accepted</span> instantly. The task is durably saved to PostgreSQL and dispatched to a RabbitMQ queue. Independent workers pick up the job, process the AI request, and save the result.
+          </p>
+        </div>
+      </section>
+
+      {/* Architecture Flow */}
+      <section className="space-y-6">
+        <h2 className="text-3xl font-black flex items-center gap-3">
+          <span className="text-2xl">⚙️</span> Architecture Flow
+        </h2>
+        <div className="grid md:grid-cols-4 gap-4 text-center">
+          <div className="bg-[#14b8a6] border-4 border-black p-4 shadow-[4px_4px_0px_0px_#000] font-bold text-lg">
+            1. Web API <br/><span className="text-sm font-normal">HTTP 202 + Outbox</span>
+          </div>
+          <div className="bg-[#ffb000] border-4 border-black p-4 shadow-[4px_4px_0px_0px_#000] font-bold text-lg">
+            2. Dispatcher <br/><span className="text-sm font-normal">RabbitMQ Publish</span>
+          </div>
+          <div className="bg-[#b19cd9] border-4 border-black p-4 shadow-[4px_4px_0px_0px_#000] font-bold text-lg">
+            3. Worker <br/><span className="text-sm font-normal">Groq AI Processing</span>
+          </div>
+          <div className="bg-[#ffe900] border-4 border-black p-4 shadow-[4px_4px_0px_0px_#000] font-bold text-lg">
+            4. PostgreSQL <br/><span className="text-sm font-normal">Durable Completion</span>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="bg-white border-4 border-black p-12 shadow-[12px_12px_0px_0px_#000] text-center space-y-6">
+        <h2 className="text-4xl font-black">See it in action.</h2>
+        <p className="text-xl font-medium">Test the end-to-end message queue and AI processing pipeline.</p>
+        <button 
+          onClick={() => router.push('/demo')}
+          className="bg-black text-white border-4 border-black font-black text-xl px-12 py-4 shadow-[6px_6px_0px_0px_#ffe900] hover:-translate-y-1 hover:shadow-[10px_10px_0px_0px_#ffe900] active:translate-y-1 active:shadow-[2px_2px_0px_0px_#ffe900] transition-all"
         >
-          {loading ? "Submitting..." : "Submit AI Task"}
+          START DEMO →
         </button>
-      </form>
+      </section>
+
     </main>
   );
 }
