@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # The postgres service has been completely removed
+
+  rabbitmq:
+    image: rabbitmq:management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: asyncforge
+      RABBITMQ_DEFAULT_PASS: password
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  migrate:
+    build: .
+    command: pnpm db:deploy
+    environment:
+      # Now dynamically reads from your .env file
+      DATABASE_URL: ${DATABASE_URL}
+    # Removed postgres from depends_on
+
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  dispatcher:
+    build:
+      context: .
+      dockerfile: Dockerfile.dispatcher
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  # Removed pgdata volume
+  rmqdata:
