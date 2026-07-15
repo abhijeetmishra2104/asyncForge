@@ -11,7 +11,7 @@
     "worker:dev": "tsx watch worker/index.ts",
     "dispatcher": "tsx dispatcher/index.ts",
     "dispatcher:dev": "tsx watch dispatcher/index.ts",
-    "lint": "eslint .",
+    "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
