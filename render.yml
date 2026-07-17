@@ -2,48 +2,62 @@ services:
   - type: web
     name: asyncforge-web
     env: node
-    buildCommand: pnpm install && pnpm db:generate && pnpm build
+
+    buildCommand: |
+      corepack enable
+      pnpm install --frozen-lockfile
+      pnpm db:generate
+      pnpm build
+
     startCommand: pnpm start
+
+    healthCheckPath: /api/health
+
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: asyncforge-db
-          property: connectionString
+        sync: false
+
       - key: RABBITMQ_URL
-        sync: false 
+        sync: false
+
       - key: GROQ_API_KEY
         sync: false
-    healthCheckPath: /api/health
 
   - type: worker
     name: asyncforge-dispatcher
     env: node
-    buildCommand: pnpm install && pnpm db:generate
+
+    buildCommand: |
+      corepack enable
+      pnpm install --frozen-lockfile
+      pnpm db:generate
+
     startCommand: pnpm dispatcher
+
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: asyncforge-db
-          property: connectionString
+        sync: false
+
       - key: RABBITMQ_URL
         sync: false
 
   - type: worker
     name: asyncforge-worker
     env: node
-    buildCommand: pnpm install && pnpm db:generate
+
+    buildCommand: |
+      corepack enable
+      pnpm install --frozen-lockfile
+      pnpm db:generate
+
     startCommand: pnpm worker
+
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: asyncforge-db
-          property: connectionString
-      - key: RABBITMQ_URL
-        sync: false
-      - key: GROQ_API_KEY
         sync: false
 
-databases:
-  - name: asyncforge-db
-    databaseName: asyncforge
-    user: asyncforge
+      - key: RABBITMQ_URL
+        sync: false
+
+      - key: GROQ_API_KEY
+        sync: false
