@@ -1,27 +1,18 @@
 services:
   - type: web
-    name: asyncforge-web
+    name: asyncforge-v2-web
     env: node
 
     buildCommand: |
       corepack enable
       pnpm install --frozen-lockfile
       pnpm db:generate
+      pnpm db:deploy
       pnpm build
 
     startCommand: pnpm start
 
     healthCheckPath: /api/health
-
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-
-      - key: RABBITMQ_URL
-        sync: false
-
-      - key: GROQ_API_KEY
-        sync: false
 
   - type: worker
     name: asyncforge-dispatcher
@@ -34,13 +25,6 @@ services:
 
     startCommand: pnpm dispatcher
 
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-
-      - key: RABBITMQ_URL
-        sync: false
-
   - type: worker
     name: asyncforge-worker
     env: node
@@ -51,13 +35,3 @@ services:
       pnpm db:generate
 
     startCommand: pnpm worker
-
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-
-      - key: RABBITMQ_URL
-        sync: false
-
-      - key: GROQ_API_KEY
-        sync: false
