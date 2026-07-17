@@ -1,17 +1,25 @@
-FROM node:20-bullseye-slim AS base
-RUN apt-get update && apt-get install -y openssl
+FROM node:20-bookworm-slim
+
+RUN apt-get update && apt-get install -y openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN apt-get update && apt-get install -y --no-install-recommends openssl libssl1.1 && rm -rf /var/lib/apt/lists/* && corepack enable && corepack prepare pnpm@9.15.0 --activate
+
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 WORKDIR /app
+
 COPY package.json pnpm-lock.yaml ./
 COPY prisma ./prisma
+
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+
 RUN pnpm db:generate
 RUN pnpm build
 
 EXPOSE 3000
-CMD ["pnpm", "start"]
+
+CMD ["pnpm","start"]
