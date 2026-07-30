@@ -16,6 +16,8 @@ const envSchema = z.object({
   RETRY_BASE_DELAY_MS: z.coerce.number().default(5000),
   RETRY_MAX_DELAY_MS: z.coerce.number().default(60000),
   JOB_PROCESSING_TIMEOUT_MS: z.coerce.number().default(300000),
+  WORKER_HEALTH_PORT: z.coerce.number().default(8081),
+  DISPATCHER_HEALTH_PORT: z.coerce.number().default(8082),
 });
 
 const _env = envSchema.safeParse(process.env);
