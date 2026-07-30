@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asyncforge-worker
+  labels:
+    app: worker
+spec:
+  replicas: 3 # Scale this up or down based on your queue backlog
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: async-forge-worker:latest # <-- UPDATE THIS TO YOUR KIND IMAGE NAME
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8081
+              name: health
+          envFrom:
+            - secretRef:
+                name: asyncforge-secrets
+            - configMapRef:
+                name: asyncforge-config
+          # Validates both Postgres and RabbitMQ connections!
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10

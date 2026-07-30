@@ -40,9 +40,17 @@ export function startHealthServer(
     }
   });
 
-  server.listen(port, () => {
-    console.log(`[${serviceName}] Health & Metrics server listening on port ${port}`);
-  });
+    console.log(`[${serviceName}] Starting health server on ${port}...`);
+
+    server.on("listening", () => {
+    console.log(`[${serviceName}] Health server listening`);
+    });
+
+    server.on("error", (err) => {
+    console.error(`[${serviceName}] Health server failed`, err);
+    });
+
+    server.listen(port);
 
   return server;
 }

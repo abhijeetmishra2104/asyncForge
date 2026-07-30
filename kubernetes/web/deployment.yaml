@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asyncforge-web
+  labels:
+    app: web
+spec:
+  replicas: 1 # Can be scaled horizontally later
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: async-forge-web:latest # <-- UPDATE THIS TO YOUR KIND IMAGE NAME
+          imagePullPolicy: IfNotPresent # Tells Kubernetes to use the locally loaded image
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: asyncforge-secrets
+            - configMapRef:
+                name: asyncforge-config
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
