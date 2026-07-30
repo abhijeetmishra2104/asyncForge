@@ -198,7 +198,7 @@ idempotency boundary.
 -   **Broker:** RabbitMQ, `amqplib`
 -   **AI:** Groq
 -   **Validation:** Zod
--   **Infrastructure:** Docker, Docker Compose
+-   **Infrastructure:** Docker, Docker Compose, Kubernetes (Kind), Prometheus, Grafana, Kubernetes Secrets, ConfigMaps, Liveness & Readiness Probes
 -   **CI:** GitHub Actions
 -   **Package Manager:** pnpm
 
@@ -383,6 +383,87 @@ Stop and remove RabbitMQ data:
 ``` bash
 docker compose down -v
 ```
+------------------------------------------------------------------------
+---
+
+# ☸️ Kubernetes Deployment
+
+After validating the architecture locally with Docker Compose, AsyncForge was deployed to a Kubernetes cluster using **Kind (Kubernetes in Docker)**.
+
+Unlike Docker Compose, Kubernetes manages each service independently, automatically restarts failed containers, performs health checks, and enables horizontal scaling with minimal configuration changes.
+
+The deployment consists of:
+
+- 🌐 Next.js Web API
+- 📤 Dispatcher
+- ⚙️ Worker Pool
+- 🐇 RabbitMQ StatefulSet
+- 🐘 PostgreSQL (Neon)
+- 📈 Prometheus
+- 📊 Grafana
+- 🔐 Kubernetes Secrets
+- ⚙️ ConfigMaps
+- ❤️ Liveness & Readiness Probes
+- 🌍 Ingress
+
+### Deployment Flow
+
+```text
+Build Docker Images
+        ↓
+Load Images into Kind
+        ↓
+Create Kubernetes Resources
+        ↓
+Deploy Pods
+        ↓
+Health Checks
+        ↓
+Prometheus Scrapes Metrics
+        ↓
+Grafana Dashboards
+```
+
+### Build Images
+
+```bash
+docker build -t async-forge-web:latest .
+docker build -f Dockerfile.worker -t async-forge-worker:latest .
+docker build -f Dockerfile.dispatcher -t async-forge-dispatcher:latest .
+```
+
+### Load Images into Kind
+
+```bash
+kind load docker-image async-forge-web:latest --name asyncforge
+kind load docker-image async-forge-worker:latest --name asyncforge
+kind load docker-image async-forge-dispatcher:latest --name asyncforge
+```
+
+### Deploy
+
+```bash
+kubectl apply -k kubernetes/overlays/local
+```
+
+### Watch Deployment
+
+```bash
+kubectl get pods -n asyncforge -w
+```
+
+### Access Services
+
+```bash
+kubectl port-forward service/web-service 3000:80 -n asyncforge
+
+kubectl port-forward service/grafana-service 3001:3000 -n asyncforge
+
+kubectl port-forward service/prometheus-service 9090:9090 -n asyncforge
+```
+
+Using Kubernetes allowed AsyncForge to move from a local proof-of-concept to a cloud-native architecture capable of automatic recovery, independent scaling, service discovery, and production-style deployments.
+
 
 ------------------------------------------------------------------------
 
@@ -699,6 +780,89 @@ become temporarily unavailable.
 
 ------------------------------------------------------------------------
 
+# 📊 Observability & Monitoring
+
+Building a distributed system without visibility quickly becomes difficult. Once AsyncForge was running reliably, production-grade observability was added using **Prometheus** and **Grafana**.
+
+Every major service exposes a `/metrics` endpoint which is periodically scraped by Prometheus.
+
+```text
+Web
+Dispatcher
+Workers
+RabbitMQ
+PostgreSQL
+        ↓
+   Prometheus
+        ↓
+    Grafana
+```
+
+### Metrics Collected
+
+#### Dispatcher
+
+- Pending Outbox Queue Depth
+- Outbox Poll Duration
+- Dispatcher Batch Size
+- Published Events Count
+
+#### Workers
+
+- Jobs Processed
+- Success / Failure Rate
+- Processing Duration
+- Retry Count
+
+#### Database
+
+- Query Count
+- Query Latency
+
+#### Groq
+
+- Request Count
+- API Latency
+- Prompt Tokens
+- Completion Tokens
+- Total Tokens
+
+### Health Endpoints
+
+Every service exposes:
+
+```text
+GET /healthz
+```
+
+Used by Kubernetes for:
+
+- Liveness Probe
+- Readiness Probe
+
+Services also expose
+
+```text
+GET /metrics
+```
+
+for Prometheus scraping.
+
+### Dashboards
+
+Grafana dashboards currently visualize:
+
+- Queue Depth
+- Job Processing Latency
+- Dispatcher Throughput
+- Database Query Latency
+- Groq Response Time
+- Token Consumption
+
+Instead of manually reading logs, bottlenecks become immediately visible through dashboards and time-series graphs.
+
+---
+
 ## 📈 Scaling Path
 
 ``` text
@@ -734,15 +898,53 @@ Consider CDC using PostgreSQL WAL + Debezium
 
 ## 🛣️ Future Improvements
 
--   `DISPATCHING` outbox state with lease metadata
--   Expired dispatcher lease recovery
--   PostgreSQL partial index for pending outbox events
--   PgBouncer for database connection pooling
--   CDC-based outbox publishing using PostgreSQL WAL and Debezium
--   WebSockets or Server-Sent Events instead of frontend polling
--   OpenTelemetry distributed tracing
--   Queue-depth, latency, and retry dashboards
--   Worker autoscaling based on RabbitMQ queue depth
+Although AsyncForge already demonstrates production-grade asynchronous processing, there are several improvements that would make the platform even more robust.
+
+### Infrastructure
+
+- Deploy on Amazon EKS / Google GKE / Azure AKS
+- Helm Charts for deployment
+- Terraform Infrastructure as Code
+- GitOps deployment using ArgoCD
+
+### Scalability
+
+- Kubernetes Horizontal Pod Autoscaler (HPA)
+- Autoscaling based on Prometheus queue-depth metrics
+- Multi-region deployments
+
+### Messaging
+
+- PostgreSQL CDC (Debezium) instead of polling
+- Delayed Exchanges for retries
+- Priority Queues
+
+### Performance
+
+- Redis caching
+- PgBouncer connection pooling
+- Read replicas
+- CDN for frontend assets
+
+### Observability
+
+- OpenTelemetry distributed tracing
+- Jaeger tracing
+- Loki centralized logging
+- Alertmanager notifications
+
+### User Experience
+
+- Replace frontend polling with WebSockets
+- Server-Sent Events
+- Live progress updates
+
+### AI
+
+- Multiple LLM providers
+- Automatic model routing
+- Cost-aware model selection
+- Prompt versioning
 
 ------------------------------------------------------------------------
 
@@ -769,36 +971,81 @@ They were:
 
 ---
 
+# ☁️ Production Readiness Journey
+
+AsyncForge evolved through multiple engineering stages.
+
+```text
+CRUD AI API
+      ↓
+Asynchronous Processing
+      ↓
+Transactional Outbox
+      ↓
+RabbitMQ
+      ↓
+Dispatcher
+      ↓
+Worker Pool
+      ↓
+Idempotency
+      ↓
+Retry Queues
+      ↓
+Dead Letter Queue
+      ↓
+Publisher Confirms
+      ↓
+Docker
+      ↓
+Kubernetes
+      ↓
+Prometheus
+      ↓
+Grafana
+      ↓
+Production Monitoring
+```
+
+Each stage solved a real engineering problem rather than adding technology for its own sake.
+
+| Stage | Problem Solved |
+|--------|----------------|
+| Transactional Outbox | Prevent lost messages |
+| RabbitMQ | Decouple API from processing |
+| Worker Pool | Horizontal scaling |
+| Idempotency | Duplicate message handling |
+| Publisher Confirms | Reliable publishing |
+| Retry Queues | Recover transient failures |
+| Dead Letter Queue | Isolate poison messages |
+| Docker | Consistent runtime |
+| Kubernetes | Self-healing & orchestration |
+| Prometheus | System visibility |
+| Grafana | Performance analysis |
+
+AsyncForge now demonstrates practical experience with:
+
+- Distributed Systems
+- Event-Driven Architecture
+- Fault Tolerance
+- Message Queues
+- Horizontal Scaling
+- Kubernetes
+- Docker
+- RabbitMQ
+- PostgreSQL
+- Prometheus
+- Grafana
+- Observability
+- Production Monitoring
+- Cloud-Native Backend Design
+
+The project started as an asynchronous AI processing system and gradually evolved into a production-style distributed backend that prioritizes reliability, scalability, observability, and fault tolerance.
+
+---
+
 > **AsyncForge was built to understand queues, failure, retries, idempotency, transactional outbox, and horizontal scaling by actually implementing them.**
 
 ⚡ **Built for failure. Designed to scale.**
 
 ---
-docker build -t async-forge-web:latest .                       
-docker build -f Dockerfile.worker -t async-forge-worker:latest .  
-docker build -f Dockerfile.dispatcher -t async-forge-dispatcher:latest .
-
-kind load docker-image async-forge-web:latest --name asyncforge
-kind load docker-image async-forge-worker:latest --name asyncforge
-kind load docker-image async-forge-dispatcher:latest --name asyncforge
-
-kubectl get pods -n asyncforge -w
-
-kubectl logs deployment/asyncforge-web -n asyncforge -f
-
-kubectl logs deployment/asyncforge-worker -n asyncforge -f
-
-kubectl logs deployment/asyncforge-dispatcher -n asyncforge -f
-
- kubectl port-forward service/web-service 3000:80 -n asyncforge
-
- kubectl port-forward svc/grafana-service 3001:3000 -n asyncforge
-
- kubectl get deployment -n asyncforge
-
- kubectl delete deployment asyncforge-web asyncforge-worker asyncforge-dispatcher -n asyncforge
-
- kubectl delete statefulset rabbitmq -n asyncforge
-kubectl delete pod rabbitmq-0 -n asyncforge --ignore-not-found
-
-kubectl apply -k kubernetes/overlays/local
