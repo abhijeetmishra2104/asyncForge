@@ -22,7 +22,7 @@ async function bootstrap() {
   );
 
   // Start the core polling loop
-  startDispatcher(channel);
+  await startDispatcher(channel);
 }
 
 async function gracefulShutdown() {
