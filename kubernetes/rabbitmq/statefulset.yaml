@@ -17,22 +17,22 @@ spec:
     spec:
       containers:
         - name: rabbitmq
-          image: rabbitmq:3-management-alpine
+          image: rabbitmq:3-management
           ports:
             - containerPort: 5672
               name: amqp
             - containerPort: 15672
               name: management
-          env:
-            - name: RABBITMQ_DEFAULT_USER
-              value: "asyncforge"
-            - name: RABBITMQ_DEFAULT_PASS
-              value: "password"
+            - containerPort: 15692 # <-- NEW: Prometheus metrics port
+              name: metrics
+          envFrom:
+            - secretRef:
+                name: asyncforge-secrets
           volumeMounts:
-            - name: rabbitmq-data
-              mountPath: /var/lib/rabbitmq
+            - name: plugins-config # <-- NEW: Mount the config map
+              mountPath: /etc/rabbitmq/enabled_plugins
+              subPath: enabled_plugins
       volumes:
-        # Using emptyDir for simple local testing. 
-        # In production overlay, you would patch this to use a PersistentVolumeClaim.
-        - name: rabbitmq-data
-          emptyDir: {}
+        - name: plugins-config # <-- NEW: Define the volume
+          configMap:
+            name: rabbitmq-plugins

@@ -3,12 +3,19 @@ kind: Service
 metadata:
   name: rabbitmq
 spec:
+  type: ClusterIP
   selector:
     app: rabbitmq
   ports:
     - name: amqp
+      protocol: TCP
       port: 5672
       targetPort: 5672
     - name: management
+      protocol: TCP
       port: 15672
       targetPort: 15672
+    - name: metrics # <-- NEW: Expose metrics port
+      protocol: TCP
+      port: 15692
+      targetPort: 15692

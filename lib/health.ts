@@ -1,5 +1,6 @@
 import { createServer, Server } from "http";
 import { prisma } from "./prisma";
+import { registry } from "./metrics";
 
 export function startHealthServer(
   port: number,
@@ -31,8 +32,14 @@ export function startHealthServer(
     } 
     // METRICS PROBE (For future Prometheus scraping)
     else if (req.url === "/metrics" && req.method === "GET") {
-      res.writeHead(200, { "Content-Type": "text/plain" });
-      res.end("# TODO: Prometheus metrics will be exposed here.\n");
+      try {
+        res.writeHead(200, { "Content-Type": registry.contentType });
+        const metrics = await registry.metrics();
+        res.end(metrics);
+      } catch (err) {
+        res.writeHead(500);
+        res.end("Failed to generate metrics");
+      }
     } 
     else {
       res.writeHead(404);

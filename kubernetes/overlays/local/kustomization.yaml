@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: asyncforge
-# Changed from bases to resources to fix the deprecation warning
+
 resources:
   - ../../base
   - ../../rabbitmq
@@ -10,3 +10,4 @@ resources:
   - ../../dispatcher
   - ../../worker
   - ../../ingress
+  - ../../observability

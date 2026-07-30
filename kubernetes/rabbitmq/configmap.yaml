@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-plugins
+data:
+  # Note: The period at the end of the line is required by Erlang syntax!
+  enabled_plugins: |
+    [rabbitmq_management,rabbitmq_prometheus].
