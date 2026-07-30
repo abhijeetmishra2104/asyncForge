@@ -7,8 +7,12 @@ type JobState = {
   status: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
   output?: {
     summary: string;
-    actionItems: { title: string; description: string; priority: string }[];
-    nextSteps: string[];
+    actionItems?: {
+      title: string;
+      description: string;
+      priority: "HIGH" | "MEDIUM" | "LOW";
+    }[];
+    nextSteps?: string[];
   };
   error?: string;
 };
@@ -73,14 +77,14 @@ export default function JobStatusPage() {
           {/* Summary Box */}
           <div className="bg-[#ffe900] p-6 border-4 border-black shadow-[6px_6px_0px_0px_#000]">
             <div className="bg-black text-white text-sm font-bold inline-block px-3 py-1 mb-4">SUMMARY</div>
-            <p className="text-xl font-bold">{job.output.summary}</p>
+            <p className="text-xl font-bold">{job.output.summary ?? "No Summary Generated"}</p>
           </div>
 
           {/* Action Items */}
           <div>
             <h3 className="font-black text-3xl mb-6 bg-white inline-block px-4 py-2 border-4 border-black shadow-[4px_4px_0px_0px_#000]">Action Items</h3>
             <div className="grid gap-6">
-              {job.output.actionItems.map((item, idx) => (
+              {job.output.actionItems?.map((item, idx) => (
                 <div key={idx} className="bg-white p-6 border-4 border-black shadow-[6px_6px_0px_0px_#000] flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   <div>
                     <h4 className="font-black text-xl mb-2">{item.title}</h4>
@@ -102,7 +106,7 @@ export default function JobStatusPage() {
           <div>
             <h3 className="font-black text-3xl mb-6 bg-white inline-block px-4 py-2 border-4 border-black shadow-[4px_4px_0px_0px_#000]">Next Steps</h3>
             <ul className="bg-[#b19cd9] border-4 border-black shadow-[8px_8px_0px_0px_#000] p-8 space-y-4">
-              {job.output.nextSteps.map((step, idx) => (
+              {job.output.nextSteps?.map((step, idx) => (
                 <li key={idx} className="flex gap-4 items-start font-bold text-lg">
                   <span className="bg-black text-white px-2 py-0.5 border-2 border-black">{idx + 1}</span>
                   {step}
