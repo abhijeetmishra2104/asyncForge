@@ -774,3 +774,31 @@ They were:
 ⚡ **Built for failure. Designed to scale.**
 
 ---
+docker build -t async-forge-web:latest .                       
+docker build -f Dockerfile.worker -t async-forge-worker:latest .  
+docker build -f Dockerfile.dispatcher -t async-forge-dispatcher:latest .
+
+kind load docker-image async-forge-web:latest --name asyncforge
+kind load docker-image async-forge-worker:latest --name asyncforge
+kind load docker-image async-forge-dispatcher:latest --name asyncforge
+
+kubectl get pods -n asyncforge -w
+
+kubectl logs deployment/asyncforge-web -n asyncforge -f
+
+kubectl logs deployment/asyncforge-worker -n asyncforge -f
+
+kubectl logs deployment/asyncforge-dispatcher -n asyncforge -f
+
+ kubectl port-forward service/web-service 3000:80 -n asyncforge
+
+ kubectl port-forward svc/grafana-service 3001:3000 -n asyncforge
+
+ kubectl get deployment -n asyncforge
+
+ kubectl delete deployment asyncforge-web asyncforge-worker asyncforge-dispatcher -n asyncforge
+
+ kubectl delete statefulset rabbitmq -n asyncforge
+kubectl delete pod rabbitmq-0 -n asyncforge --ignore-not-found
+
+kubectl apply -k kubernetes/overlays/local

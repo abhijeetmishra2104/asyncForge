@@ -38,6 +38,15 @@ export async function processJob(jobId: string, attempt: number) {
 
   try {
     const aiResult = await executeAITask(job.prompt);
+
+    if (
+      !aiResult ||
+      typeof aiResult.summary !== "string" ||
+      !Array.isArray(aiResult.actionItems) ||
+      !Array.isArray(aiResult.nextSteps)
+    ) {
+      throw new Error("Invalid AI response format");
+    }
     
     // Complete the job durably before ACK
     await prisma.job.update({
