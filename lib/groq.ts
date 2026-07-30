@@ -1,51 +1,43 @@
 import Groq from "groq-sdk";
-import { z } from "zod";
 import { env } from "./env";
+import { 
+  groqRequestsCounter, 
+  groqRequestDurationHistogram, 
+  groqTokensCounter 
+} from "./metrics";
 
-export const groq = new Groq({ apiKey: env.GROQ_API_KEY });
+const groq = new Groq({ apiKey: env.GROQ_API_KEY });
 
-export const aiOutputSchema = z.object({
-  summary: z.string(),
-  actionItems: z.array(
-    z.object({
-      title: z.string(),
-      description: z.string(),
-      priority: z.enum(["HIGH", "MEDIUM", "LOW"]),
-    })
-  ),
-  nextSteps: z.array(z.string()),
-});
-
-export type AIOutput = z.infer<typeof aiOutputSchema>;
-
-export async function executeAITask(prompt: string): Promise<AIOutput> {
-  const completion = await groq.chat.completions.create({
-    model: env.GROQ_MODEL,
-    messages: [
-      {
-        role: "system",
-        content: `You are an expert task planning assistant. Analyze the user's request and return JSON matching this schema exactly:
-{
-  "summary": "one sentence summary",
-  "actionItems": [
-    { "title": "...", "description": "...", "priority": "HIGH|MEDIUM|LOW" }
-  ],
-  "nextSteps": ["..."]
-}
-Return ONLY valid JSON. No markdown code fences.`,
-      },
-      { role: "user", content: prompt },
-    ],
-    response_format: { type: "json_object" },
-  });
-
-  const rawContent = completion.choices[0]?.message?.content;
-  if (!rawContent) throw new Error("Empty response from Groq");
+export async function executeAITask(prompt: string): Promise<string> {
+  // 1. Start the Prometheus timer
+  const endTimer = groqRequestDurationHistogram.startTimer({ model: env.GROQ_MODEL });
 
   try {
-    const parsed = JSON.parse(rawContent);
-    return aiOutputSchema.parse(parsed);
-  } catch (error) {
-    throw new Error(`Invalid JSON or schema from Groq: ${error instanceof Error ? error.message : "Unknown error"}`);
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: env.GROQ_MODEL,
+    });
+
+    // 2. Record successful API call
+    groqRequestsCounter.inc({ model: env.GROQ_MODEL, status: "success" });
+
+    // 3. Record granular token usage for cost analysis
+    if (completion.usage) {
+      groqTokensCounter.inc({ model: env.GROQ_MODEL, type: "prompt" }, completion.usage.prompt_tokens);
+      groqTokensCounter.inc({ model: env.GROQ_MODEL, type: "completion" }, completion.usage.completion_tokens);
+      groqTokensCounter.inc({ model: env.GROQ_MODEL, type: "total" }, completion.usage.total_tokens);
+    }
+
+    return completion.choices[0]?.message?.content || "";
+    
+  } catch (error: any) {
+    // 4. Record failures, specifically tagging rate limits (HTTP 429)
+    const status = error?.status === 429 ? "rate_limited" : "error";
+    groqRequestsCounter.inc({ model: env.GROQ_MODEL, status });
+    throw error;
+    
+  } finally {
+    // 5. Stop the timer (happens on both success and failure)
+    endTimer();
   }
 }
