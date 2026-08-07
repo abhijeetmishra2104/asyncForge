@@ -1,4 +1,6 @@
 node_modules
+# Bare "node_modules" only matches the root one; nested copies need a glob.
+**/node_modules
 .next
 dist
 .git
@@ -6,3 +8,6 @@ dist
 .env
 .env.*
 *.log
+
+# The React Native app is not part of any server image.
+mobile

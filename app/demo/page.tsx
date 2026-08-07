@@ -2,29 +2,40 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/client-auth";
 
 export default function DemoPage() {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
-    });
+    setError(null);
 
-    if (res.ok) {
-      const data = await res.json();
-      router.push(`/jobs/${data.jobId}`);
-    } else {
-      alert("Failed to submit task");
-      setLoading(false);
+    try {
+      // apiFetch registers this browser on first use and attaches the token.
+      const res = await apiFetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        router.push(`/jobs/${data.jobId}`);
+        return;
+      }
+
+      const body = await res.json().catch(() => null);
+      setError(body?.error ?? "Failed to submit task.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to submit task.");
     }
+
+    setLoading(false);
   };
 
   return (
@@ -58,6 +69,12 @@ export default function DemoPage() {
         >
           {loading ? "Forging Task..." : "Execute"}
         </button>
+
+        {error && (
+          <div className="bg-red-500 text-white border-4 border-black p-4 shadow-[4px_4px_0px_0px_#000] font-bold">
+            {error}
+          </div>
+        )}
       </form>
     </main>
   );

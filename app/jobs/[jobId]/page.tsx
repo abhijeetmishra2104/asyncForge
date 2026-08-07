@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { apiFetch } from "@/lib/client-auth";
 
 type JobState = {
   status: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
@@ -25,8 +26,10 @@ export default function JobStatusPage() {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const res = await fetch(`/api/status/${params.jobId}`);
+        const res = await apiFetch(`/api/status/${params.jobId}`);
         if (!res.ok) {
+          // A job owned by another device is reported as 404, same as a job
+          // that never existed.
           if (res.status === 404) setError("Job not found.");
           return;
         }
