@@ -25,7 +25,9 @@ export async function processJob(jobId: string, attempt: number) {
       console.log(`[Worker] Job ${jobId} already terminal (${existingJob.status}). Bypassing.`);
       return; 
     }
-    throw new Error(`Job ${jobId} currently processing by another worker.`);
+    // Another worker holds the lease. This is ordinary contention, not a
+    // failure — the message must go back for a later attempt.
+    throw new RetryableError(`Job ${jobId} currently processing by another worker.`);
   }
 
   const job = await prisma.job.findUnique({ where: { id: jobId } });
