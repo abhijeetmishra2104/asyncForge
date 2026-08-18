@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Mirrors the backend contract. Kept in sync by hand with:
  *   - prisma/schema.prisma            (JobStatus enum, Job fields)
- *   - lib/groq.ts                     (AIResponse)
+ *   - lib/gemini.ts                     (AIResponse)
  *   - app/api/status/[jobId]/route.ts (the exact `select` shape)
  *
  * If these drift, this is the file to update.
@@ -23,7 +23,7 @@ export type Priority = z.infer<typeof prioritySchema>;
 export const actionItemSchema = z.object({
   title: z.string(),
   description: z.string(),
-  // Groq is only prompt-constrained, not schema-constrained, so an unexpected
+  // Gemini is only prompt-constrained, not schema-constrained, so an unexpected
   // priority string degrades to MEDIUM instead of failing the whole payload.
   priority: prioritySchema.catch('MEDIUM'),
 });

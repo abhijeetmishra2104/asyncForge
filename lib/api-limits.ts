@@ -2,7 +2,7 @@
  * Request limits for the public API.
  *
  * These read process.env directly rather than going through lib/env.ts on
- * purpose: that module also requires RABBITMQ_URL and GROQ_API_KEY and calls
+ * purpose: that module also requires RABBITMQ_URL and GEMINI_API_KEY and calls
  * process.exit(1) when they are missing, which is correct for the worker and
  * dispatcher but wrong for a web request path.
  */
@@ -16,7 +16,7 @@ function positiveInt(name: string, fallback: number): number {
 
 const HOUR_MS = 60 * 60 * 1000;
 
-/** Jobs a single device may submit per window. Each one costs a Groq call. */
+/** Jobs a single device may submit per window. Each one costs a Gemini call. */
 export const ANALYZE_LIMIT = positiveInt("ANALYZE_RATE_LIMIT", 20);
 export const ANALYZE_WINDOW_MS = positiveInt("ANALYZE_RATE_WINDOW_MS", HOUR_MS);
 
