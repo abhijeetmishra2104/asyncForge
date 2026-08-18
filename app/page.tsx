@@ -53,7 +53,7 @@ export default function LandingPage() {
             2. Dispatcher <br/><span className="text-sm font-normal">RabbitMQ Publish</span>
           </div>
           <div className="bg-[#b19cd9] border-4 border-black p-4 shadow-[4px_4px_0px_0px_#000] font-bold text-lg">
-            3. Worker <br/><span className="text-sm font-normal">Groq AI Processing</span>
+            3. Worker <br/><span className="text-sm font-normal">Gemini AI Processing</span>
           </div>
           <div className="bg-[#ffe900] border-4 border-black p-4 shadow-[4px_4px_0px_0px_#000] font-bold text-lg">
             4. PostgreSQL <br/><span className="text-sm font-normal">Durable Completion</span>

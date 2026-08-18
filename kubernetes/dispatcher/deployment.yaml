@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asyncforge-dispatcher
+  labels:
+    app: dispatcher
+spec:
+  replicas: 1 # MUST BE 1 to avoid duplicate message publishing
+  selector:
+    matchLabels:
+      app: dispatcher
+  template:
+    metadata:
+      labels:
+        app: dispatcher
+    spec:
+      containers:
+        - name: dispatcher
+          image: async-forge-dispatcher:latest # <-- UPDATE THIS TO YOUR KIND IMAGE NAME
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+              name: health
+          envFrom:
+            - secretRef:
+                name: asyncforge-secrets
+            - configMapRef:
+                name: asyncforge-config
+          # Kubernetes will hit the custom HTTP server we built!
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10

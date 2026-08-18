@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "../../../../lib/prisma"; // Use the shared instance
+import { prisma } from "@/lib/prisma";
+import { authenticateDevice } from "@/lib/auth";
 
 export async function GET(req: NextRequest, { params }: { params: { jobId: string } }) {
   try {
-    const job = await prisma.job.findUnique({
-      where: { id: params.jobId },
+    const device = await authenticateDevice(req);
+    if (!device) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401, headers: { "WWW-Authenticate": "Bearer" } }
+      );
+    }
+
+    // Scoped by owner, so a job belonging to someone else is indistinguishable
+    // from one that does not exist. Jobs created before authentication have a
+    // null deviceId and are therefore unreachable, which is intended.
+    const job = await prisma.job.findFirst({
+      where: { id: params.jobId, deviceId: device.id },
       select: {
         id: true,
         status: true,

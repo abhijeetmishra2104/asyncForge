@@ -1,7 +1,7 @@
 import { prisma } from "../lib/prisma";
-import { executeAITask } from "../lib/groq";
+import { executeAITask } from "../lib/gemini";
 import { env } from "../lib/env";
-
+import { jobsProcessedCounter, jobDurationHistogram } from "../lib/metrics";
 
 export async function processJob(jobId: string, attempt: number) {
   // Idempotent Job Acquisition: Only acquire if QUEUED or PROCESSING lease expired
@@ -25,7 +25,9 @@ export async function processJob(jobId: string, attempt: number) {
       console.log(`[Worker] Job ${jobId} already terminal (${existingJob.status}). Bypassing.`);
       return; 
     }
-    throw new Error(`Job ${jobId} currently processing by another worker.`);
+    // Another worker holds the lease. This is ordinary contention, not a
+    // failure — the message must go back for a later attempt.
+    throw new RetryableError(`Job ${jobId} currently processing by another worker.`);
   }
 
   const job = await prisma.job.findUnique({ where: { id: jobId } });
@@ -33,8 +35,20 @@ export async function processJob(jobId: string, attempt: number) {
 
   console.log(`[Worker] Processing Job ${jobId} (Attempt ${job.attempts})`);
 
+  // Start duration timer for job execution
+  const endTimer = jobDurationHistogram.startTimer({ model: env.GEMINI_MODEL });
+
   try {
     const aiResult = await executeAITask(job.prompt);
+
+    if (
+      !aiResult ||
+      typeof aiResult.summary !== "string" ||
+      !Array.isArray(aiResult.actionItems) ||
+      !Array.isArray(aiResult.nextSteps)
+    ) {
+      throw new Error("Invalid AI response format");
+    }
     
     // Complete the job durably before ACK
     await prisma.job.update({
@@ -48,9 +62,15 @@ export async function processJob(jobId: string, attempt: number) {
     });
     console.log(`[Worker] Job ${jobId} COMPLETED successfully.`);
 
+    // Record success counter metric
+    jobsProcessedCounter.inc({ status: "success" });
+
   } catch (error) {
     console.error(`[Worker] Job ${jobId} execution failed:`, error);
     
+    // Record failed counter metric
+    jobsProcessedCounter.inc({ status: "failed" });
+
     const isRetryable = job.attempts < env.MAX_JOB_ATTEMPTS;
     const errorMessage = error instanceof Error ? error.message : "Unknown AI Processing Error";
 
@@ -67,6 +87,9 @@ export async function processJob(jobId: string, attempt: number) {
       });
       throw new FatalError("Maximum retries exhausted");
     }
+  } finally {
+    // Always observe the duration histogram
+    endTimer();
   }
 }
 
