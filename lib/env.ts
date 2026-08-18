@@ -7,8 +7,8 @@ config();
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   RABBITMQ_URL: z.string().url(),
-  GROQ_API_KEY: z.string().min(1),
-  GROQ_MODEL: z.string().default("openai/gpt-oss-20b"),
+  GEMINI_API_KEY: z.string().min(1),
+  GEMINI_MODEL: z.string().default("gemini-3.6-flash"),
   MAX_JOB_ATTEMPTS: z.coerce.number().default(3),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().default(1000),
   OUTBOX_BATCH_SIZE: z.coerce.number().default(20),

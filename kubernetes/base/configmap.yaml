@@ -5,7 +5,7 @@ metadata:
   namespace: asyncforge
 data:
   # AI Model Configuration
-  GROQ_MODEL: "openai/gpt-oss-20b"
+  GEMINI_MODEL: "gemini-3.6-flash"
   
   # RabbitMQ Configuration
   RABBITMQ_PREFETCH: "1"

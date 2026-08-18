@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma";
-import { executeAITask } from "../lib/groq";
+import { executeAITask } from "../lib/gemini";
 import { env } from "../lib/env";
 import { jobsProcessedCounter, jobDurationHistogram } from "../lib/metrics";
 
@@ -36,7 +36,7 @@ export async function processJob(jobId: string, attempt: number) {
   console.log(`[Worker] Processing Job ${jobId} (Attempt ${job.attempts})`);
 
   // Start duration timer for job execution
-  const endTimer = jobDurationHistogram.startTimer({ model: env.GROQ_MODEL });
+  const endTimer = jobDurationHistogram.startTimer({ model: env.GEMINI_MODEL });
 
   try {
     const aiResult = await executeAITask(job.prompt);

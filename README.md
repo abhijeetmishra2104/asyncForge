@@ -2,11 +2,11 @@
 
 > **A fault-tolerant, horizontally scalable asynchronous AI task
 > processing system built with Next.js, PostgreSQL, RabbitMQ, and
-> Groq.**
+> Gemini.**
 
 # ⚡ AsyncForge
 
-> **A fault-tolerant, horizontally scalable asynchronous AI task processing system built with Next.js, PostgreSQL, RabbitMQ, and Groq.**
+> **A fault-tolerant, horizontally scalable asynchronous AI task processing system built with Next.js, PostgreSQL, RabbitMQ, and Gemini.**
 
 ### ⚡ Accept Fast · 📦 Queue Reliably · ⚙️ Process Asynchronously · 🛡️ Recover From Failure
 
@@ -25,7 +25,7 @@ That is fine for a demo. It becomes fragile when AI tasks are slow.
 -   HTTP requests can time out.
 -   Users can close the browser.
 -   Workers can crash.
--   Groq can rate-limit or temporarily fail.
+-   Gemini can rate-limit or temporarily fail.
 -   Messages can be delivered more than once.
 -   A database write can succeed while queue publishing fails.
 
@@ -57,7 +57,7 @@ flowchart LR
     MQ --> W2["⚙️ Worker B"]
     MQ --> W3["⚙️ Worker C"]
 
-    W1 --> AI["🤖 Groq"]
+    W1 --> AI["🤖 Gemini"]
     W2 --> AI
     W3 --> AI
 
@@ -83,7 +83,7 @@ flowchart LR
 6.  The dispatcher publishes events to RabbitMQ.
 7.  RabbitMQ distributes tasks among competing workers.
 8.  A worker atomically acquires a job and marks it `PROCESSING`.
-9.  The worker calls Groq.
+9.  The worker calls Gemini.
 10. The structured AI output is validated.
 11. The result is persisted as `COMPLETED`.
 12. The worker ACKs the RabbitMQ message only after durable completion.
@@ -196,7 +196,7 @@ idempotency boundary.
 -   **Frontend/API:** Next.js, React, TypeScript, Tailwind CSS
 -   **Database:** PostgreSQL, Prisma ORM
 -   **Broker:** RabbitMQ, `amqplib`
--   **AI:** Groq
+-   **AI:** Gemini
 -   **Validation:** Zod
 -   **Infrastructure:** Docker, Docker Compose, Kubernetes (Kind), Prometheus, Grafana, Kubernetes Secrets, ConfigMaps, Liveness & Readiness Probes
 -   **CI:** GitHub Actions
@@ -212,7 +212,7 @@ PostgreSQL   → Source of truth for Jobs and OutboxEvents
 Dispatcher   → Reliably move outbox events to RabbitMQ
 RabbitMQ     → Queue and distribute tasks
 Workers      → Execute AI workloads and persist results
-Groq         → Perform AI analysis
+Gemini         → Perform AI analysis
 ```
 
 ------------------------------------------------------------------------
@@ -227,7 +227,7 @@ Install:
 -   pnpm
 -   Docker and Docker Compose
 -   Access to a PostgreSQL database
--   A Groq API key
+-   A Gemini API key
 
 > The supplied Docker Compose file uses an external PostgreSQL database
 > through `DATABASE_URL`. RabbitMQ runs in Docker.
@@ -249,7 +249,7 @@ pnpm install
 
 ``` env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
-GROQ_API_KEY="your_groq_api_key"
+GEMINI_API_KEY="your_gemini_api_key"
 
 RABBITMQ_URL="amqp://asyncforge:password@localhost:5672"
 
@@ -328,7 +328,7 @@ pnpm worker
 Your system is now running:
 
 ``` text
-Next.js → PostgreSQL → Dispatcher → RabbitMQ → Worker → Groq
+Next.js → PostgreSQL → Dispatcher → RabbitMQ → Worker → Gemini
 ```
 
 ------------------------------------------------------------------------
@@ -339,7 +339,7 @@ Create `.env`:
 
 ``` env
 DATABASE_URL="your_postgresql_connection_string"
-GROQ_API_KEY="your_groq_api_key"
+GEMINI_API_KEY="your_gemini_api_key"
 ```
 
 Build and start:
@@ -527,7 +527,7 @@ time.
 
 ### What this proves
 
-> **Decoupling:** The web server does not wait for Groq and remains
+> **Decoupling:** The web server does not wait for Gemini and remains
 > responsive while the worker drains the backlog.
 
 > **Durability:** Accepted jobs remain represented by durable state
@@ -761,7 +761,7 @@ blindly execute the AI workload again.
 
 ``` mermaid
 flowchart TD
-    A["Worker receives task"] --> B["Call Groq"]
+    A["Worker receives task"] --> B["Call Gemini"]
     B -->|Success| C["Validate output"]
     C --> D["Persist COMPLETED"]
     D --> E["ACK"]
@@ -819,7 +819,7 @@ PostgreSQL
 - Query Count
 - Query Latency
 
-#### Groq
+#### Gemini
 
 - Request Count
 - API Latency
@@ -856,7 +856,7 @@ Grafana dashboards currently visualize:
 - Job Processing Latency
 - Dispatcher Throughput
 - Database Query Latency
-- Groq Response Time
+- Gemini Response Time
 - Token Consumption
 
 Instead of manually reading logs, bottlenecks become immediately visible through dashboards and time-series graphs.
@@ -887,7 +887,7 @@ Consider CDC using PostgreSQL WAL + Debezium
 
 ## 🔐 Security Notes
 
--   Never expose `DATABASE_URL`, `RABBITMQ_URL`, or `GROQ_API_KEY` to
+-   Never expose `DATABASE_URL`, `RABBITMQ_URL`, or `GEMINI_API_KEY` to
     the browser.
 -   Never commit `.env`.
 -   Do not reuse local RabbitMQ credentials in production.
