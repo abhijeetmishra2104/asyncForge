@@ -16,7 +16,7 @@ import { colors, priorityColors, spacing, statusColors } from '@/theme';
 
 const STAGE_HINT: Record<string, string> = {
   QUEUED: 'Durably stored in PostgreSQL. Waiting for the dispatcher to publish it to RabbitMQ.',
-  PROCESSING: 'A worker has claimed the job and is calling Groq.',
+  PROCESSING: 'A worker has claimed the job and is calling Gemini.',
 };
 
 export default function JobScreen() {
@@ -106,7 +106,7 @@ export default function JobScreen() {
               <SectionHeading>Unreadable result</SectionHeading>
               <Text style={styles.body}>
                 The job completed, but the stored output did not match the
-                expected schema. This usually means Groq returned JSON in a shape
+                expected schema. This usually means Gemini returned JSON in a shape
                 the prompt did not constrain.
               </Text>
             </View>

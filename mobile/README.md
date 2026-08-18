@@ -63,7 +63,7 @@ wires `AppState` into React Query's `focusManager` so polling pauses when the
 app is not in the foreground.
 
 **`job.output` is validated before it is rendered.** It is a free-form JSON
-column filled from an LLM response, and `lib/groq.ts` only constrains the shape
+column filled from an LLM response, and `lib/gemini.ts` only constrains the shape
 by prompt. A malformed payload degrades to an "unreadable result" card rather
 than crashing the screen.
 
@@ -73,7 +73,7 @@ this, any dependency missing from `mobile/node_modules` would silently resolve
 against the web app's tree — including a second copy of React.
 
 **Types are duplicated, not shared.** `src/lib/types.ts` mirrors
-`prisma/schema.prisma`, `lib/groq.ts` and the `select` in
+`prisma/schema.prisma`, `lib/gemini.ts` and the `select` in
 `app/api/status/[jobId]/route.ts` by hand. Extracting a shared package would mean
 restructuring the repo into a workspace and updating the Dockerfiles, k8s
 manifests and CI that are keyed to the current paths — not worth it for ~30
@@ -82,6 +82,6 @@ lines. If they start drifting, that is the signal to do it properly.
 ## Not done yet
 
 The API has no authentication. Shipping this app makes `/api/analyze` a public,
-unmetered proxy to the Groq key, and `/api/status/:jobId` will return any job to
+unmetered proxy to the Gemini key, and `/api/status/:jobId` will return any job to
 anyone holding an id. Adding a `userId` to `Job`, scoping the status query, and
 rate limiting `/api/analyze` should land before this goes anywhere real.

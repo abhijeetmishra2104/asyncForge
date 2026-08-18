@@ -34,7 +34,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
-      GROQ_API_KEY: ${GROQ_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -46,7 +46,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
-      GROQ_API_KEY: ${GROQ_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -60,7 +60,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
-      GROQ_API_KEY: ${GROQ_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       rabbitmq:
         condition: service_healthy

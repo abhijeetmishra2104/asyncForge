@@ -50,25 +50,25 @@ export const outboxBatchSizeHistogram = new client.Histogram({
 });
 
 // ==========================================
-// 5. GROQ AI METRICS
+// 5. GEMINI AI METRICS
 // ==========================================
 
-export const groqRequestsCounter = new client.Counter({
-  name: 'asyncforge_groq_requests_total',
-  help: 'Total requests made to the Groq API',
+export const geminiRequestsCounter = new client.Counter({
+  name: 'asyncforge_gemini_requests_total',
+  help: 'Total requests made to the Gemini API',
   labelNames: ['model', 'status'], // status: 'success', 'error', 'rate_limited'
 });
 
-export const groqRequestDurationHistogram = new client.Histogram({
-  name: 'asyncforge_groq_request_duration_seconds',
-  help: 'Latency of Groq API calls',
+export const geminiRequestDurationHistogram = new client.Histogram({
+  name: 'asyncforge_gemini_request_duration_seconds',
+  help: 'Latency of Gemini API calls',
   labelNames: ['model'],
   buckets: [0.1, 0.5, 1, 2, 5, 10, 20], 
 });
 
-export const groqTokensCounter = new client.Counter({
-  name: 'asyncforge_groq_tokens_total',
-  help: 'Token usage from Groq API',
+export const geminiTokensCounter = new client.Counter({
+  name: 'asyncforge_gemini_tokens_total',
+  help: 'Token usage from Gemini API',
   labelNames: ['model', 'type'], // type: 'prompt', 'completion', 'total'
 });
 

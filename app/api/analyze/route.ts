@@ -11,7 +11,7 @@ const analyzeRequestSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    // Every accepted job costs a Groq call, so this endpoint is authenticated
+    // Every accepted job costs a Gemini call, so this endpoint is authenticated
     // and metered. Clients register once via POST /api/devices.
     const device = await authenticateDevice(req);
     if (!device) {
