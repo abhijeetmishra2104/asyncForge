@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+   url      = env("DATABASE_URL")
 }
 
 enum JobStatus {
@@ -30,7 +31,41 @@ model Job {
   startedAt   DateTime?
   completedAt DateTime?
 
+  // Nullable so the migration does not have to invent an owner for jobs
+  // created before authentication existed. Those rows are unreachable through
+  // the API from now on, which is the intended outcome.
+  deviceId String?
+  device   Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
   @@index([status, createdAt])
+  // Serves both ownership lookups and the per-device rate limit window count.
+  @@index([deviceId, createdAt])
+}
+
+/// An anonymous client install (a phone or a browser). Registration is
+/// automatic on first use; there are no credentials for a human to manage.
+model Device {
+  id        String   @id @default(cuid())
+  /// SHA-256 of the bearer token. The token itself is returned exactly once,
+  /// at registration, and is never stored.
+  tokenHash String   @unique
+  platform  String?
+  createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  jobs Job[]
+
+  @@index([lastSeenAt])
+}
+
+/// Fixed-window counters for rate limiting. Keyed by an opaque string so the
+/// same table serves both per-device and per-IP limits.
+model RateLimit {
+  key         String   @id
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@index([windowStart])
 }
 
 model OutboxEvent {

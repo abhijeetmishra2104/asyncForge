@@ -2,11 +2,11 @@
 
 > **A fault-tolerant, horizontally scalable asynchronous AI task
 > processing system built with Next.js, PostgreSQL, RabbitMQ, and
-> Groq.**
+> Gemini.**
 
 # ⚡ AsyncForge
 
-> **A fault-tolerant, horizontally scalable asynchronous AI task processing system built with Next.js, PostgreSQL, RabbitMQ, and Groq.**
+> **A fault-tolerant, horizontally scalable asynchronous AI task processing system built with Next.js, PostgreSQL, RabbitMQ, and Gemini.**
 
 ### ⚡ Accept Fast · 📦 Queue Reliably · ⚙️ Process Asynchronously · 🛡️ Recover From Failure
 
@@ -25,7 +25,7 @@ That is fine for a demo. It becomes fragile when AI tasks are slow.
 -   HTTP requests can time out.
 -   Users can close the browser.
 -   Workers can crash.
--   Groq can rate-limit or temporarily fail.
+-   Gemini can rate-limit or temporarily fail.
 -   Messages can be delivered more than once.
 -   A database write can succeed while queue publishing fails.
 
@@ -57,7 +57,7 @@ flowchart LR
     MQ --> W2["⚙️ Worker B"]
     MQ --> W3["⚙️ Worker C"]
 
-    W1 --> AI["🤖 Groq"]
+    W1 --> AI["🤖 Gemini"]
     W2 --> AI
     W3 --> AI
 
@@ -83,7 +83,7 @@ flowchart LR
 6.  The dispatcher publishes events to RabbitMQ.
 7.  RabbitMQ distributes tasks among competing workers.
 8.  A worker atomically acquires a job and marks it `PROCESSING`.
-9.  The worker calls Groq.
+9.  The worker calls Gemini.
 10. The structured AI output is validated.
 11. The result is persisted as `COMPLETED`.
 12. The worker ACKs the RabbitMQ message only after durable completion.
@@ -196,9 +196,9 @@ idempotency boundary.
 -   **Frontend/API:** Next.js, React, TypeScript, Tailwind CSS
 -   **Database:** PostgreSQL, Prisma ORM
 -   **Broker:** RabbitMQ, `amqplib`
--   **AI:** Groq
+-   **AI:** Gemini
 -   **Validation:** Zod
--   **Infrastructure:** Docker, Docker Compose
+-   **Infrastructure:** Docker, Docker Compose, Kubernetes (Kind), Prometheus, Grafana, Kubernetes Secrets, ConfigMaps, Liveness & Readiness Probes
 -   **CI:** GitHub Actions
 -   **Package Manager:** pnpm
 
@@ -212,7 +212,7 @@ PostgreSQL   → Source of truth for Jobs and OutboxEvents
 Dispatcher   → Reliably move outbox events to RabbitMQ
 RabbitMQ     → Queue and distribute tasks
 Workers      → Execute AI workloads and persist results
-Groq         → Perform AI analysis
+Gemini         → Perform AI analysis
 ```
 
 ------------------------------------------------------------------------
@@ -227,7 +227,7 @@ Install:
 -   pnpm
 -   Docker and Docker Compose
 -   Access to a PostgreSQL database
--   A Groq API key
+-   A Gemini API key
 
 > The supplied Docker Compose file uses an external PostgreSQL database
 > through `DATABASE_URL`. RabbitMQ runs in Docker.
@@ -249,7 +249,7 @@ pnpm install
 
 ``` env
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
-GROQ_API_KEY="your_groq_api_key"
+GEMINI_API_KEY="your_gemini_api_key"
 
 RABBITMQ_URL="amqp://asyncforge:password@localhost:5672"
 
@@ -328,7 +328,7 @@ pnpm worker
 Your system is now running:
 
 ``` text
-Next.js → PostgreSQL → Dispatcher → RabbitMQ → Worker → Groq
+Next.js → PostgreSQL → Dispatcher → RabbitMQ → Worker → Gemini
 ```
 
 ------------------------------------------------------------------------
@@ -339,7 +339,7 @@ Create `.env`:
 
 ``` env
 DATABASE_URL="your_postgresql_connection_string"
-GROQ_API_KEY="your_groq_api_key"
+GEMINI_API_KEY="your_gemini_api_key"
 ```
 
 Build and start:
@@ -383,6 +383,87 @@ Stop and remove RabbitMQ data:
 ``` bash
 docker compose down -v
 ```
+------------------------------------------------------------------------
+---
+
+# ☸️ Kubernetes Deployment
+
+After validating the architecture locally with Docker Compose, AsyncForge was deployed to a Kubernetes cluster using **Kind (Kubernetes in Docker)**.
+
+Unlike Docker Compose, Kubernetes manages each service independently, automatically restarts failed containers, performs health checks, and enables horizontal scaling with minimal configuration changes.
+
+The deployment consists of:
+
+- 🌐 Next.js Web API
+- 📤 Dispatcher
+- ⚙️ Worker Pool
+- 🐇 RabbitMQ StatefulSet
+- 🐘 PostgreSQL (Neon)
+- 📈 Prometheus
+- 📊 Grafana
+- 🔐 Kubernetes Secrets
+- ⚙️ ConfigMaps
+- ❤️ Liveness & Readiness Probes
+- 🌍 Ingress
+
+### Deployment Flow
+
+```text
+Build Docker Images
+        ↓
+Load Images into Kind
+        ↓
+Create Kubernetes Resources
+        ↓
+Deploy Pods
+        ↓
+Health Checks
+        ↓
+Prometheus Scrapes Metrics
+        ↓
+Grafana Dashboards
+```
+
+### Build Images
+
+```bash
+docker build -t async-forge-web:latest .
+docker build -f Dockerfile.worker -t async-forge-worker:latest .
+docker build -f Dockerfile.dispatcher -t async-forge-dispatcher:latest .
+```
+
+### Load Images into Kind
+
+```bash
+kind load docker-image async-forge-web:latest --name asyncforge
+kind load docker-image async-forge-worker:latest --name asyncforge
+kind load docker-image async-forge-dispatcher:latest --name asyncforge
+```
+
+### Deploy
+
+```bash
+kubectl apply -k kubernetes/overlays/local
+```
+
+### Watch Deployment
+
+```bash
+kubectl get pods -n asyncforge -w
+```
+
+### Access Services
+
+```bash
+kubectl port-forward service/web-service 3000:80 -n asyncforge
+
+kubectl port-forward service/grafana-service 3001:3000 -n asyncforge
+
+kubectl port-forward service/prometheus-service 9090:9090 -n asyncforge
+```
+
+Using Kubernetes allowed AsyncForge to move from a local proof-of-concept to a cloud-native architecture capable of automatic recovery, independent scaling, service discovery, and production-style deployments.
+
 
 ------------------------------------------------------------------------
 
@@ -446,7 +527,7 @@ time.
 
 ### What this proves
 
-> **Decoupling:** The web server does not wait for Groq and remains
+> **Decoupling:** The web server does not wait for Gemini and remains
 > responsive while the worker drains the backlog.
 
 > **Durability:** Accepted jobs remain represented by durable state
@@ -680,7 +761,7 @@ blindly execute the AI workload again.
 
 ``` mermaid
 flowchart TD
-    A["Worker receives task"] --> B["Call Groq"]
+    A["Worker receives task"] --> B["Call Gemini"]
     B -->|Success| C["Validate output"]
     C --> D["Persist COMPLETED"]
     D --> E["ACK"]
@@ -698,6 +779,89 @@ calls fail, workers crash, messages are redelivered, and dependencies
 become temporarily unavailable.
 
 ------------------------------------------------------------------------
+
+# 📊 Observability & Monitoring
+
+Building a distributed system without visibility quickly becomes difficult. Once AsyncForge was running reliably, production-grade observability was added using **Prometheus** and **Grafana**.
+
+Every major service exposes a `/metrics` endpoint which is periodically scraped by Prometheus.
+
+```text
+Web
+Dispatcher
+Workers
+RabbitMQ
+PostgreSQL
+        ↓
+   Prometheus
+        ↓
+    Grafana
+```
+
+### Metrics Collected
+
+#### Dispatcher
+
+- Pending Outbox Queue Depth
+- Outbox Poll Duration
+- Dispatcher Batch Size
+- Published Events Count
+
+#### Workers
+
+- Jobs Processed
+- Success / Failure Rate
+- Processing Duration
+- Retry Count
+
+#### Database
+
+- Query Count
+- Query Latency
+
+#### Gemini
+
+- Request Count
+- API Latency
+- Prompt Tokens
+- Completion Tokens
+- Total Tokens
+
+### Health Endpoints
+
+Every service exposes:
+
+```text
+GET /healthz
+```
+
+Used by Kubernetes for:
+
+- Liveness Probe
+- Readiness Probe
+
+Services also expose
+
+```text
+GET /metrics
+```
+
+for Prometheus scraping.
+
+### Dashboards
+
+Grafana dashboards currently visualize:
+
+- Queue Depth
+- Job Processing Latency
+- Dispatcher Throughput
+- Database Query Latency
+- Gemini Response Time
+- Token Consumption
+
+Instead of manually reading logs, bottlenecks become immediately visible through dashboards and time-series graphs.
+
+---
 
 ## 📈 Scaling Path
 
@@ -723,7 +887,7 @@ Consider CDC using PostgreSQL WAL + Debezium
 
 ## 🔐 Security Notes
 
--   Never expose `DATABASE_URL`, `RABBITMQ_URL`, or `GROQ_API_KEY` to
+-   Never expose `DATABASE_URL`, `RABBITMQ_URL`, or `GEMINI_API_KEY` to
     the browser.
 -   Never commit `.env`.
 -   Do not reuse local RabbitMQ credentials in production.
@@ -734,15 +898,53 @@ Consider CDC using PostgreSQL WAL + Debezium
 
 ## 🛣️ Future Improvements
 
--   `DISPATCHING` outbox state with lease metadata
--   Expired dispatcher lease recovery
--   PostgreSQL partial index for pending outbox events
--   PgBouncer for database connection pooling
--   CDC-based outbox publishing using PostgreSQL WAL and Debezium
--   WebSockets or Server-Sent Events instead of frontend polling
--   OpenTelemetry distributed tracing
--   Queue-depth, latency, and retry dashboards
--   Worker autoscaling based on RabbitMQ queue depth
+Although AsyncForge already demonstrates production-grade asynchronous processing, there are several improvements that would make the platform even more robust.
+
+### Infrastructure
+
+- Deploy on Amazon EKS / Google GKE / Azure AKS
+- Helm Charts for deployment
+- Terraform Infrastructure as Code
+- GitOps deployment using ArgoCD
+
+### Scalability
+
+- Kubernetes Horizontal Pod Autoscaler (HPA)
+- Autoscaling based on Prometheus queue-depth metrics
+- Multi-region deployments
+
+### Messaging
+
+- PostgreSQL CDC (Debezium) instead of polling
+- Delayed Exchanges for retries
+- Priority Queues
+
+### Performance
+
+- Redis caching
+- PgBouncer connection pooling
+- Read replicas
+- CDN for frontend assets
+
+### Observability
+
+- OpenTelemetry distributed tracing
+- Jaeger tracing
+- Loki centralized logging
+- Alertmanager notifications
+
+### User Experience
+
+- Replace frontend polling with WebSockets
+- Server-Sent Events
+- Live progress updates
+
+### AI
+
+- Multiple LLM providers
+- Automatic model routing
+- Cost-aware model selection
+- Prompt versioning
 
 ------------------------------------------------------------------------
 
@@ -766,6 +968,79 @@ They were:
 > *How do I scale processing without coupling it to the web server?*
 
 > *Where is the source of truth when multiple systems coordinate?*
+
+---
+
+# ☁️ Production Readiness Journey
+
+AsyncForge evolved through multiple engineering stages.
+
+```text
+CRUD AI API
+      ↓
+Asynchronous Processing
+      ↓
+Transactional Outbox
+      ↓
+RabbitMQ
+      ↓
+Dispatcher
+      ↓
+Worker Pool
+      ↓
+Idempotency
+      ↓
+Retry Queues
+      ↓
+Dead Letter Queue
+      ↓
+Publisher Confirms
+      ↓
+Docker
+      ↓
+Kubernetes
+      ↓
+Prometheus
+      ↓
+Grafana
+      ↓
+Production Monitoring
+```
+
+Each stage solved a real engineering problem rather than adding technology for its own sake.
+
+| Stage | Problem Solved |
+|--------|----------------|
+| Transactional Outbox | Prevent lost messages |
+| RabbitMQ | Decouple API from processing |
+| Worker Pool | Horizontal scaling |
+| Idempotency | Duplicate message handling |
+| Publisher Confirms | Reliable publishing |
+| Retry Queues | Recover transient failures |
+| Dead Letter Queue | Isolate poison messages |
+| Docker | Consistent runtime |
+| Kubernetes | Self-healing & orchestration |
+| Prometheus | System visibility |
+| Grafana | Performance analysis |
+
+AsyncForge now demonstrates practical experience with:
+
+- Distributed Systems
+- Event-Driven Architecture
+- Fault Tolerance
+- Message Queues
+- Horizontal Scaling
+- Kubernetes
+- Docker
+- RabbitMQ
+- PostgreSQL
+- Prometheus
+- Grafana
+- Observability
+- Production Monitoring
+- Cloud-Native Backend Design
+
+The project started as an asynchronous AI processing system and gradually evolved into a production-style distributed backend that prioritizes reliability, scalability, observability, and fault tolerance.
 
 ---
 

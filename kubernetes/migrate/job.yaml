@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prisma-migrate
+spec:
+  # If it fails (e.g., DB is temporarily down), try 5 times before giving up
+  backoffLimit: 5 
+  template:
+    metadata:
+      labels:
+        app: db-migration
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: prisma-migrate
+          image: async-forge-web:latest # <-- UPDATE THIS TO YOUR EXACT KIND IMAGE NAME
+          imagePullPolicy: IfNotPresent # Crucial for kind/local images
+          command:
+            - /bin/sh
+            - -c
+            - "pnpm db:deploy" # Use `prisma migrate deploy` for production
+          envFrom:
+            - secretRef:
+                name: asyncforge-secrets
+            - configMapRef:
+                name: asyncforge-config

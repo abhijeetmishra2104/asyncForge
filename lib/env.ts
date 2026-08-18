@@ -7,8 +7,8 @@ config();
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   RABBITMQ_URL: z.string().url(),
-  GROQ_API_KEY: z.string().min(1),
-  GROQ_MODEL: z.string().default("openai/gpt-oss-20b"),
+  GEMINI_API_KEY: z.string().min(1),
+  GEMINI_MODEL: z.string().default("gemini-3.6-flash"),
   MAX_JOB_ATTEMPTS: z.coerce.number().default(3),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().default(1000),
   OUTBOX_BATCH_SIZE: z.coerce.number().default(20),
@@ -16,6 +16,8 @@ const envSchema = z.object({
   RETRY_BASE_DELAY_MS: z.coerce.number().default(5000),
   RETRY_MAX_DELAY_MS: z.coerce.number().default(60000),
   JOB_PROCESSING_TIMEOUT_MS: z.coerce.number().default(300000),
+  WORKER_HEALTH_PORT: z.coerce.number().default(8081),
+  DISPATCHER_HEALTH_PORT: z.coerce.number().default(8082),
 });
 
 const _env = envSchema.safeParse(process.env);

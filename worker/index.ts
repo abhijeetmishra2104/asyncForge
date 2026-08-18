@@ -1,34 +1,54 @@
-import { connectRabbitMQ, setupTopology } from "../lib/rabbitmq";
+import { env } from "../lib/env";
+import { startHealthServer } from "../lib/health";
 import { startConsumer } from "./consumer";
 import { prisma } from "../lib/prisma";
+import {
+  getChannel,
+  closeRabbitMQ,
+  isRabbitMQConnected,
+} from "../lib/rabbitmq";
 
-let connection: any = null;
-let channel: any = null;
+import { Server } from "http";
+
+let healthServer: Server | null = null;
 
 async function bootstrap() {
-  connection = await connectRabbitMQ();
-  channel = await connection.createChannel();
-  await setupTopology(channel);
-  
+  const channel = await getChannel();
+
+  healthServer = startHealthServer(
+    env.WORKER_HEALTH_PORT,
+    "Worker",
+    isRabbitMQConnected
+  );
+
   await startConsumer(channel);
 }
 
 async function gracefulShutdown() {
   console.log("[Worker] Graceful shutdown initiated...");
-  if (channel) {
-    console.log("[Worker] Closing channel to stop receiving new messages...");
-    await channel.close();
-  }
-  if (connection) await connection.close();
+
+  if (healthServer !== null) {
+  await new Promise<void>((resolve) => {
+    healthServer!.close(() => resolve());
+  });
+}
+
+  await closeRabbitMQ();
   await prisma.$disconnect();
+
   console.log("[Worker] Shutdown complete.");
+
   process.exit(0);
 }
 
 process.on("SIGINT", gracefulShutdown);
 process.on("SIGTERM", gracefulShutdown);
 
-bootstrap().catch((err) => {
+bootstrap().catch(async (err) => {
   console.error("[Worker] Fatal error during bootstrap:", err);
+
+  await closeRabbitMQ();
+  await prisma.$disconnect();
+
   process.exit(1);
 });
