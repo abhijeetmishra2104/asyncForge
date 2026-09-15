@@ -146,6 +146,55 @@ kubectl get svc web-service -n asyncforge   # EXTERNAL-IP, takes a minute on fir
 
 ---
 
+## Custom domain: app.asyncforge.me
+
+The app is reachable on the reserved static IP `34.47.179.34`
+(`google_compute_address.web` in Terraform, pinned as `spec.loadBalancerIP` in
+`patch-web-service.yaml`). Because it is reserved rather than ephemeral, the
+address survives a Service delete or a full cluster teardown, so the DNS record
+below does not need updating after a rebuild.
+
+TLS terminates at Cloudflare's edge, which costs nothing and avoids running a
+cert on the cluster:
+
+```
+browser --HTTPS--> Cloudflare edge --HTTP--> 34.47.179.34 (GCP L4 LB) --> web pod
+```
+
+**Cloudflare setup (one time)**
+
+1. Add `asyncforge.me` as a site on the Cloudflare free plan.
+2. Cloudflare gives you two nameservers. In Namecheap → Domain → Nameservers,
+   switch to **Custom DNS** and enter them. Propagation is usually minutes.
+3. In Cloudflare → DNS, add:
+
+   | Type | Name  | Content        | Proxy  |
+   |------|-------|----------------|--------|
+   | A    | `app` | `34.47.179.34` | Proxied (orange) |
+
+   The orange cloud is what does the work — grey-clouded, DNS resolves
+   straight to GCP and you get plain HTTP with no certificate.
+4. SSL/TLS → Overview → set the mode to **Flexible**. The origin has no
+   certificate, so Full or Strict would fail. This means the Cloudflare→GCP
+   hop is unencrypted inside Google's network; fine for a demo, and the fix
+   later is a cert on the origin plus Full mode.
+
+The apex `asyncforge.me` is left alone, so a GitHub Pages site can keep it.
+Pages needs its own records at the apex — keep them grey-clouded (DNS only),
+since Pages terminates its own TLS.
+
+**Verify**
+
+```bash
+dig +short app.asyncforge.me          # Cloudflare edge IPs, not 34.47.179.34
+curl -sI https://app.asyncforge.me | head -3
+```
+
+Seeing Cloudflare's IPs rather than the GCP one is the proxy working, not a
+misconfiguration.
+
+---
+
 ## What the GCP overlay changes
 
 `kubernetes/overlays/gcp` shares a base with `overlays/local`, with these

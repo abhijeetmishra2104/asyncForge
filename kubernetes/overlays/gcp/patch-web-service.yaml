@@ -12,3 +12,8 @@ spec:
   # ClusterIP and reach the app with:
   #   kubectl port-forward -n asyncforge svc/web-service 3000:80
   type: LoadBalancer
+
+  # Reserved in terraform as google_compute_address.web. Pinning it here means
+  # a deleted-and-recreated Service (or a whole cluster rebuild) comes back on
+  # the same address, so the DNS record for app.asyncforge.me keeps working.
+  loadBalancerIP: 34.47.179.34

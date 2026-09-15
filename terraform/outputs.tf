@@ -40,3 +40,8 @@ output "github_actions_setup" {
       GEMINI_API_KEY                 = <your Gemini key>
   EOT
 }
+
+output "web_static_ip" {
+  description = "Point app.asyncforge.me at this. Pinned in patch-web-service.yaml."
+  value       = google_compute_address.web.address
+}

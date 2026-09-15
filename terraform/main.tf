@@ -90,6 +90,24 @@ resource "google_artifact_registry_repository_iam_member" "nodes_can_pull" {
 }
 
 # ---------------------------------------------------------------------------
+# Static IP for the web LoadBalancer
+# ---------------------------------------------------------------------------
+# Without a reservation the LoadBalancer gets an ephemeral address, which is
+# released whenever the Service (or the whole cluster) is torn down — and any
+# DNS record pointing at it goes stale. Reserving it means the teardown /
+# recreate cycle keeps the same address, so app.asyncforge.me stays valid.
+#
+# kubernetes/overlays/gcp/patch-web-service.yaml pins spec.loadBalancerIP to
+# this address so a recreated Service reclaims it.
+
+resource "google_compute_address" "web" {
+  name   = "asyncforge-web"
+  region = var.region
+
+  depends_on = [google_project_service.services]
+}
+
+# ---------------------------------------------------------------------------
 # Keyless deploys from GitHub Actions (Workload Identity Federation)
 # ---------------------------------------------------------------------------
 # GitHub Actions gets a short-lived OIDC token from GitHub, trades it for a
