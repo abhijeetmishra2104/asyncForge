@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="AsyncForge">
+  <title>AsyncForge</title>
+  <rect width="64" height="64" fill="#ffe900"/>
+  <g transform="translate(4.57,-0.56) scale(0.857)">
+    <path d="M4 22 H60 V32 H46 L43 44 H52 V54 H12 V44 H21 L18 32 H4 Z" fill="#000000"/>
+  </g>
+</svg>

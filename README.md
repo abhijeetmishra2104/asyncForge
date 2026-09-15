@@ -1,14 +1,16 @@
-# ⚡ AsyncForge
+<div align="center">
 
-> **A fault-tolerant, horizontally scalable asynchronous AI task
-> processing system built with Next.js, PostgreSQL, RabbitMQ, and
-> Gemini.**
+<img src="public/logo.png" alt="AsyncForge" width="110" />
 
-# ⚡ AsyncForge
+# AsyncForge
 
 > **A fault-tolerant, horizontally scalable asynchronous AI task processing system built with Next.js, PostgreSQL, RabbitMQ, and Gemini.**
 
 ### ⚡ Accept Fast · 📦 Queue Reliably · ⚙️ Process Asynchronously · 🛡️ Recover From Failure
+
+**Live at [app.asyncforge.me](https://app.asyncforge.me)**
+
+</div>
 
 ---
 
