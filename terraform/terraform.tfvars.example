@@ -1,0 +1,9 @@
+# cp terraform.tfvars.example terraform.tfvars, then fill these in.
+
+project_id        = "asyncforge-470000"
+github_repository = "abhijeetmishra2104/async-forge"
+
+# Defaults, override if you want:
+# region        = "asia-south1"
+# cluster_name  = "asyncforge"
+# repository_id = "asyncforge"

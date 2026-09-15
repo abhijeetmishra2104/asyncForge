@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asyncforge-web
+spec:
+  replicas: 1
+  template:
+    spec:
+      # Spot Pods cost roughly a third of regular ones. GCP can reclaim them
+      # with 25s notice; the web tier is stateless so it just reschedules.
+      # If Pods sit Pending because spot capacity ran out in the region,
+      # delete this nodeSelector and re-apply.
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      containers:
+        - name: web
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi

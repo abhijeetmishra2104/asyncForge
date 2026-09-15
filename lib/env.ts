@@ -13,6 +13,10 @@ const envSchema = z.object({
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().default(1000),
   OUTBOX_BATCH_SIZE: z.coerce.number().default(20),
   RABBITMQ_PREFETCH: z.coerce.number().default(1),
+  // Quorum queues need a broker that allows them. Some managed shared brokers
+  // (e.g. CloudAMQP's free tier) may reject them, so this is switchable
+  // without a code change.
+  RABBITMQ_QUEUE_TYPE: z.enum(["quorum", "classic"]).default("quorum"),
   RETRY_BASE_DELAY_MS: z.coerce.number().default(5000),
   RETRY_MAX_DELAY_MS: z.coerce.number().default(60000),
   JOB_PROCESSING_TIMEOUT_MS: z.coerce.number().default(300000),

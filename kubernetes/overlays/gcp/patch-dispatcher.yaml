@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asyncforge-dispatcher
+spec:
+  # Still exactly 1: two dispatchers would publish the same outbox event twice.
+  replicas: 1
+  template:
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      containers:
+        - name: dispatcher
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi

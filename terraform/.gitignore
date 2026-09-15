@@ -1,0 +1,7 @@
+# State can contain secrets and is machine-specific.
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+crash.log

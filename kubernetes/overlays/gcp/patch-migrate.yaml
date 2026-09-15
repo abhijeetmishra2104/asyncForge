@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prisma-migrate
+spec:
+  template:
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      containers:
+        - name: prisma-migrate
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
