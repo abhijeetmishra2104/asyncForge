@@ -27,7 +27,11 @@ RabbitMQ StatefulSet, Prometheus and Grafana, for free.
 
 ```bash
 brew install --cask google-cloud-sdk
-brew install terraform
+brew install hashicorp/tap/terraform   # not homebrew-core, HashiCorp moved it
+
+# the cask does not touch PATH for you:
+echo 'export PATH="/opt/homebrew/share/google-cloud-sdk/bin:$PATH"' >> ~/.zshrc
+exec zsh
 
 gcloud auth login
 gcloud auth application-default login   # this is what Terraform uses
