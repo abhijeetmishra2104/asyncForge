@@ -213,6 +213,16 @@ deliberate differences:
    hardcoded to `host: localhost`.
 5. **RabbitMQ, Prometheus and Grafana are not deployed.** Both are one
    uncommented line away in `kustomization.yaml` if you want them back.
+6. **No Secret.** `kubernetes/secret/` is included only by `overlays/local`.
+   On GCP the deploy workflow creates `asyncforge-secrets` from GitHub Actions
+   secrets, so running `kubectl apply -k kubernetes/overlays/gcp` locally
+   cannot overwrite live credentials with your dev ones.
+7. **`Recreate` rollouts for the worker and dispatcher.** The default
+   RollingUpdate surges a second pod. For the dispatcher that momentarily runs
+   two outbox publishers, which is exactly what its `replicas: 1` comment
+   forbids. For the worker it deadlocks the rollout, because a trial project
+   has a `PREEMPTIBLE_CPUS` quota of 0 in `asia-south1` and no second Spot node
+   can be created to hold the surge pod.
 
 Worker replicas are 1. Scale up when you want to demo the queue draining, then
 scale back down:

@@ -42,4 +42,4 @@ next-env.d.ts
 /docs*
 
 # Real k8s Secret manifest — holds live credentials. Use secret.example.yaml as the template.
-kubernetes/base/secret.yaml
+kubernetes/secret/secret.yaml

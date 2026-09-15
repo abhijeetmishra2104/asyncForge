@@ -4,6 +4,15 @@ metadata:
   name: asyncforge-dispatcher
 spec:
   # Still exactly 1: two dispatchers would publish the same outbox event twice.
+  #
+  # replicas: 1 alone does not guarantee that. The default RollingUpdate
+  # strategy surges an extra pod (maxSurge 25% rounds up to 1), so every
+  # deploy briefly runs two dispatchers polling the same outbox. Recreate is
+  # what actually enforces the invariant the line above claims.
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+
   replicas: 1
   template:
     spec:

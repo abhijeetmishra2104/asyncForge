@@ -3,6 +3,16 @@ kind: Deployment
 metadata:
   name: asyncforge-worker
 spec:
+  # Terminate the old pod before starting the new one. The default
+  # RollingUpdate surges an extra pod, and with PREEMPTIBLE_CPUS quota at 0 on
+  # a trial project no second Spot node can be created to hold it — the
+  # rollout deadlocks with the old pod occupying the capacity the new one
+  # needs. Recreate costs a few seconds of consumer downtime, which the queue
+  # absorbs: unacked messages are simply redelivered.
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+
   # 3 workers on Autopilot is 1.5 vCPU of billed request for an app that is
   # idle most of the time. Scale up on demand:
   #   kubectl scale deploy/asyncforge-worker -n asyncforge --replicas=3

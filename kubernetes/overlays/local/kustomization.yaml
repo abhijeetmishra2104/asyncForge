@@ -4,6 +4,7 @@ namespace: asyncforge
 
 resources:
   - ../../base
+  - ../../secret
   - ../../rabbitmq
   - ../../migrate
   - ../../web

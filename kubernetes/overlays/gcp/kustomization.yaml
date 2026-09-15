@@ -9,9 +9,10 @@ namespace: asyncforge
 # Postgres on Neon, RabbitMQ on CloudAMQP. overlays/local still runs the full
 # stack (broker + Prometheus + Grafana) on kind, for free.
 #
-# base/ pulls in secret.yaml, which is gitignored: locally you copy it from
-# secret.example.yaml, and in CI the deploy workflow generates it from GitHub
-# Actions secrets before applying.
+# Note what is absent: kubernetes/secret. This overlay deploys no Secret at
+# all — the deploy workflow creates asyncforge-secrets from GitHub Actions
+# secrets. That way `kubectl apply -k` from a laptop cannot overwrite the live
+# credentials with the dev ones in kubernetes/secret/secret.yaml.
 resources:
   - ../../base
   - ../../migrate

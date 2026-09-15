@@ -90,14 +90,18 @@ jobs:
           cluster_name: ${{ vars.GKE_CLUSTER }}
           location: ${{ vars.GCP_REGION }}
 
-      # kubernetes/base/secret.yaml is gitignored. Generating it here keeps the
-      # GCP overlay identical in shape to the local one, and `kubectl create
-      # --dry-run=client` handles escaping for us.
+      # The GCP overlay contains no Secret at all, so this is the only thing that
+      # writes those credentials — nothing on a laptop can overwrite them by
+      # running `kubectl apply -k`. `kubectl create --dry-run=client` handles
+      # escaping for us.
       #
       # RABBITMQ_URL points at CloudAMQP (amqps://...). The two RABBITMQ_DEFAULT_*
       # values are only consumed by the in-cluster broker, which this overlay
       # does not deploy — leave them unset unless you uncomment ../../rabbitmq.
-      - name: Render the Secret
+      - name: Ensure the namespace exists
+        run: kubectl apply -f kubernetes/base/namespace.yaml
+
+      - name: Create the Secret
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -112,7 +116,7 @@ jobs:
             --from-literal=RABBITMQ_URL="$RABBITMQ_URL" \
             --from-literal=RABBITMQ_DEFAULT_USER="$RABBITMQ_DEFAULT_USER" \
             --from-literal=RABBITMQ_DEFAULT_PASS="$RABBITMQ_DEFAULT_PASS" \
-            --dry-run=client -o yaml > kubernetes/base/secret.yaml
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Point the overlay at this build
         run: |
