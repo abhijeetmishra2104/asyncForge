@@ -9,6 +9,10 @@ data:
   
   # RabbitMQ Configuration
   RABBITMQ_PREFETCH: "1"
+  # Set to "classic" if your broker rejects quorum queues (some managed
+  # shared brokers do). Changing this requires deleting the existing
+  # asyncforge.tasks.process queue, since queue type is immutable.
+  RABBITMQ_QUEUE_TYPE: "quorum"
   
   # Outbox Pattern Configuration
   OUTBOX_POLL_INTERVAL_MS: "1000"

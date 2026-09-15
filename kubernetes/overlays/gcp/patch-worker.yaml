@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asyncforge-worker
+spec:
+  # 3 workers on Autopilot is 1.5 vCPU of billed request for an app that is
+  # idle most of the time. Scale up on demand:
+  #   kubectl scale deploy/asyncforge-worker -n asyncforge --replicas=3
+  replicas: 1
+  template:
+    spec:
+      # A reclaimed worker is the failure this whole system was built to
+      # survive: the RabbitMQ message is never ACKed, so another worker
+      # picks the job back up.
+      nodeSelector:
+        cloud.google.com/gke-spot: "true"
+      containers:
+        - name: worker
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi

@@ -464,6 +464,17 @@ kubectl port-forward service/prometheus-service 9090:9090 -n asyncforge
 
 Using Kubernetes allowed AsyncForge to move from a local proof-of-concept to a cloud-native architecture capable of automatic recovery, independent scaling, service discovery, and production-style deployments.
 
+### Running it on GCP
+
+The same manifests run on GKE Autopilot through `kubernetes/overlays/gcp`: the
+three stateless workloads in-cluster at 1 replica each, with Postgres on Neon
+and RabbitMQ on CloudAMQP rather than stateful pods on preemptible nodes. The
+cluster and the keyless GitHub Actions trust are defined in `terraform/`, and
+`.github/workflows/deploy.yml` builds, migrates, and rolls out on every green
+build of `main`.
+
+See **[DEPLOY-GCP.md](DEPLOY-GCP.md)** for the full runbook and the cost
+breakdown.
 
 ------------------------------------------------------------------------
 

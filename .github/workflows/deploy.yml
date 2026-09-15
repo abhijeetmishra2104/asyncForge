@@ -1,0 +1,153 @@
+name: Deploy to GKE
+
+# Deploys only after CI has gone green on main, so a broken build never
+# reaches the cluster. Re-run by hand from the Actions tab if needed.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Two deploys racing each other would fight over the migration Job.
+concurrency:
+  group: deploy-gke
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # required to mint the GitHub OIDC token for GCP
+
+jobs:
+  deploy:
+    # workflow_dispatch has no workflow_run payload, hence the second clause.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    env:
+      # Commit that passed CI — not whatever main happens to be right now.
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      IMAGE_BASE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.AR_REPOSITORY }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SHA }}
+
+      # Keyless: no service-account JSON anywhere. Terraform set up the
+      # trust between this repo and the deployer service account.
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: gke-gcloud-auth-plugin
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Three images, one context. Layer cache lives in GitHub Actions cache,
+      # otherwise every deploy would re-run `pnpm install` three times.
+      - name: Build and push web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ env.IMAGE_BASE }}/web:${{ env.SHA }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+      - name: Build and push worker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          push: true
+          tags: ${{ env.IMAGE_BASE }}/worker:${{ env.SHA }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,scope=worker,mode=max
+
+      - name: Build and push dispatcher
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.dispatcher
+          push: true
+          tags: ${{ env.IMAGE_BASE }}/dispatcher:${{ env.SHA }}
+          cache-from: type=gha,scope=dispatcher
+          cache-to: type=gha,scope=dispatcher,mode=max
+
+      - name: Get cluster credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ vars.GKE_CLUSTER }}
+          location: ${{ vars.GCP_REGION }}
+
+      # kubernetes/base/secret.yaml is gitignored. Generating it here keeps the
+      # GCP overlay identical in shape to the local one, and `kubectl create
+      # --dry-run=client` handles escaping for us.
+      #
+      # RABBITMQ_URL points at CloudAMQP (amqps://...). The two RABBITMQ_DEFAULT_*
+      # values are only consumed by the in-cluster broker, which this overlay
+      # does not deploy — leave them unset unless you uncomment ../../rabbitmq.
+      - name: Render the Secret
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          RABBITMQ_URL: ${{ secrets.RABBITMQ_URL }}
+          RABBITMQ_DEFAULT_USER: ${{ secrets.RABBITMQ_DEFAULT_USER }}
+          RABBITMQ_DEFAULT_PASS: ${{ secrets.RABBITMQ_DEFAULT_PASS }}
+        run: |
+          kubectl create secret generic asyncforge-secrets \
+            --namespace asyncforge \
+            --from-literal=DATABASE_URL="$DATABASE_URL" \
+            --from-literal=GEMINI_API_KEY="$GEMINI_API_KEY" \
+            --from-literal=RABBITMQ_URL="$RABBITMQ_URL" \
+            --from-literal=RABBITMQ_DEFAULT_USER="$RABBITMQ_DEFAULT_USER" \
+            --from-literal=RABBITMQ_DEFAULT_PASS="$RABBITMQ_DEFAULT_PASS" \
+            --dry-run=client -o yaml > kubernetes/base/secret.yaml
+
+      - name: Point the overlay at this build
+        run: |
+          sed -i \
+            -e "s|REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY|${IMAGE_BASE}|g" \
+            -e "s|IMAGE_TAG|${SHA}|g" \
+            kubernetes/overlays/gcp/kustomization.yaml
+          kubectl kustomize kubernetes/overlays/gcp | grep -E '^\s+image:'
+
+      # A Job's pod template is immutable, so re-applying one with a new image
+      # tag is rejected. Delete it first and let the apply recreate it.
+      - name: Reset the migration Job
+        run: kubectl delete job prisma-migrate -n asyncforge --ignore-not-found --wait=true
+
+      - name: Apply manifests
+        run: kubectl apply -k kubernetes/overlays/gcp
+
+      - name: Wait for the database migration
+        run: kubectl wait --for=condition=complete job/prisma-migrate -n asyncforge --timeout=5m
+
+      - name: Wait for rollouts
+        run: |
+          for d in asyncforge-web asyncforge-dispatcher asyncforge-worker; do
+            kubectl rollout status deploy/$d -n asyncforge --timeout=5m
+          done
+
+      - name: Report the public IP
+        run: |
+          IP=$(kubectl get svc web-service -n asyncforge -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "### Deployed \`${SHA:0:7}\`" >> $GITHUB_STEP_SUMMARY
+          echo "AsyncForge is at http://${IP:-<pending>}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Dump diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get pods -n asyncforge -o wide || true
+          kubectl logs job/prisma-migrate -n asyncforge --tail=50 || true
+          kubectl get events -n asyncforge --sort-by=.lastTimestamp | tail -30 || true

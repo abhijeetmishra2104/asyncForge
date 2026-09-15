@@ -170,7 +170,7 @@ export async function setupTopology(
     deadLetterExchange: EXCHANGES.DLX,
     deadLetterRoutingKey: ROUTING_KEYS.TASK_CREATED,
     arguments: {
-      "x-queue-type": "quorum",
+      "x-queue-type": env.RABBITMQ_QUEUE_TYPE,
     },
   });
 

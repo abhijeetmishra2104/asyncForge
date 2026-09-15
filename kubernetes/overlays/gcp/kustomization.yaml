@@ -1,0 +1,65 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: asyncforge
+
+# Cheapest-that-still-demonstrates-Kubernetes configuration.
+#
+# Autopilot bills per Pod *request*, so the only things that run here are the
+# three stateless app workloads. Anything stateful is a managed service:
+# Postgres on Neon, RabbitMQ on CloudAMQP. overlays/local still runs the full
+# stack (broker + Prometheus + Grafana) on kind, for free.
+#
+# base/ pulls in secret.yaml, which is gitignored: locally you copy it from
+# secret.example.yaml, and in CI the deploy workflow generates it from GitHub
+# Actions secrets before applying.
+resources:
+  - ../../base
+  - ../../migrate
+  - ../../web
+  - ../../dispatcher
+  - ../../worker
+
+  # --- Deliberately not deployed on GCP -----------------------------------
+  # ../../rabbitmq
+  #   A StatefulSet with no volumeClaimTemplate on preemptible nodes would
+  #   lose every queued message on eviction. Use CloudAMQP's free tier and
+  #   point RABBITMQ_URL at it instead. To run it in-cluster anyway,
+  #   uncomment this line AND patch-rabbitmq.yaml below (~$6/month on spot).
+  #
+  # ../../observability
+  #   Prometheus + Grafana are 0.5 vCPU / 1 GiB of billed request, ~$10/month,
+  #   for dashboards you can already get free from Cloud Monitoring. To turn
+  #   them on, uncomment this line AND the two patches below. Note that the
+  #   Prometheus config scrapes rabbitmq:15692, which will simply report that
+  #   target as down while the broker is external.
+  # ------------------------------------------------------------------------
+
+# The deploy workflow rewrites these placeholders before applying.
+# Preview locally with:
+#   kubectl kustomize kubernetes/overlays/gcp
+images:
+  - name: async-forge-web
+    newName: REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/web
+    newTag: IMAGE_TAG
+  - name: async-forge-dispatcher
+    newName: REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/dispatcher
+    newTag: IMAGE_TAG
+  - name: async-forge-worker
+    newName: REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/worker
+    newTag: IMAGE_TAG
+
+patches:
+  # Autopilot defaults to 0.5 vCPU / 2 GiB per *container* when requests are
+  # omitted. Every workload below is pinned to the Autopilot minimum
+  # (250m / 512Mi) unless it genuinely needs more.
+  - path: patch-web.yaml
+  - path: patch-dispatcher.yaml
+  - path: patch-worker.yaml
+  - path: patch-migrate.yaml
+  - path: patch-web-service.yaml
+
+  # Only valid when the matching resource above is uncommented; kustomize
+  # errors on a patch with no target.
+  # - path: patch-rabbitmq.yaml
+  # - path: patch-prometheus.yaml
+  # - path: patch-grafana.yaml
