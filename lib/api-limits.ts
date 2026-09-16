@@ -30,3 +30,10 @@ export const REGISTER_WINDOW_MS = positiveInt(
   "DEVICE_REGISTER_RATE_WINDOW_MS",
   HOUR_MS
 );
+
+/**
+ * Mirrors the worker's retry ceiling so the status API can report how many
+ * attempts a job gets. lib/env.ts owns the value the worker actually enforces;
+ * this only reports it, which is why the default must stay in step with it.
+ */
+export const MAX_JOB_ATTEMPTS = positiveInt("MAX_JOB_ATTEMPTS", 3);
