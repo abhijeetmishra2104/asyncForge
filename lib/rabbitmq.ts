@@ -181,6 +181,34 @@ export async function setupTopology(
   );
 }
 
+/** Jitter variants per delay tier. Each distinct delay is its own queue. */
+const JITTER_VARIANTS = 3;
+
+/**
+ * Picks the delay for a retry that should wait roughly `targetMs`.
+ *
+ * Delayed retries live in TTL queues, one queue per distinct delay. The delay
+ * used to be exponential backoff plus Math.random() * 1000 milliseconds, so
+ * nearly every retry minted a queue nobody ever deleted — and CloudAMQP's free
+ * tier caps a vhost at 100 queues, after which no retry can be scheduled at all.
+ *
+ * Delays now come from a fixed ladder — base, 2×base, 4×base … capped at the
+ * maximum — and jitter picks one of three variants of the tier (+0%, +10%,
+ * +20%). That still spreads out retries that fail together, and the number of
+ * retry queues can never exceed tiers × 3 however long the system runs.
+ */
+export function retryDelayMs(targetMs: number, random: () => number = Math.random): number {
+  const base = env.RETRY_BASE_DELAY_MS;
+  const max = env.RETRY_MAX_DELAY_MS;
+
+  let tier = base;
+  while (tier < targetMs && tier < max) tier *= 2;
+  tier = Math.min(tier, max);
+
+  const variant = Math.floor(random() * JITTER_VARIANTS);
+  return Math.min(Math.round(tier * (1 + variant / 10)), max);
+}
+
 /**
  * Retry queue
  */

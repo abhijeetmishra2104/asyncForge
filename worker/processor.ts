@@ -1,9 +1,25 @@
 import { prisma } from "../lib/prisma";
-import { executeAITask } from "../lib/gemini";
+import { executeAITask, type AIResponse } from "../lib/gemini";
 import { env } from "../lib/env";
 import { jobsProcessedCounter, jobDurationHistogram } from "../lib/metrics";
 
-export async function processJob(jobId: string, attempt: number) {
+/**
+ * Everything processJob reaches outside itself for. Production passes nothing
+ * and gets Gemini plus the configured limits; tests substitute a fake model and
+ * short timings so crash and retry paths run in seconds instead of minutes.
+ */
+export type ProcessDeps = {
+  executeAI?: (prompt: string) => Promise<AIResponse>;
+  /** How long a PROCESSING job is owned by its worker before another may take it. */
+  leaseMs?: number;
+  maxAttempts?: number;
+};
+
+export async function processJob(jobId: string, deps: ProcessDeps = {}) {
+  const executeAI = deps.executeAI ?? executeAITask;
+  const leaseMs = deps.leaseMs ?? env.JOB_PROCESSING_TIMEOUT_MS;
+  const maxAttempts = deps.maxAttempts ?? env.MAX_JOB_ATTEMPTS;
+
   // Idempotent Job Acquisition: Only acquire if QUEUED or PROCESSING lease expired
   const lockAcquired = await prisma.$executeRaw`
     UPDATE "Job"
@@ -13,7 +29,7 @@ export async function processJob(jobId: string, attempt: number) {
         "updatedAt" = NOW()
     WHERE id = ${jobId} AND (
       status = 'QUEUED' OR 
-      (status = 'PROCESSING' AND "updatedAt" < NOW() - INTERVAL '5 minutes')
+      (status = 'PROCESSING' AND "updatedAt" < NOW() - (${leaseMs}::float8 * INTERVAL '1 millisecond'))
     )
   `;
 
@@ -25,9 +41,10 @@ export async function processJob(jobId: string, attempt: number) {
       console.log(`[Worker] Job ${jobId} already terminal (${existingJob.status}). Bypassing.`);
       return; 
     }
-    // Another worker holds the lease. This is ordinary contention, not a
-    // failure — the message must go back for a later attempt.
-    throw new RetryableError(`Job ${jobId} currently processing by another worker.`);
+    // Another worker holds the lease — alive, or crashed without releasing it.
+    // Say when the lease runs out, so the message can come back then.
+    const retryAfterMs = Math.max(0, existingJob.updatedAt.getTime() + leaseMs - Date.now());
+    throw new LeaseHeldError(`Job ${jobId} is leased by another worker.`, retryAfterMs);
   }
 
   const job = await prisma.job.findUnique({ where: { id: jobId } });
@@ -39,7 +56,7 @@ export async function processJob(jobId: string, attempt: number) {
   const endTimer = jobDurationHistogram.startTimer({ model: env.GEMINI_MODEL });
 
   try {
-    const aiResult = await executeAITask(job.prompt);
+    const aiResult = await executeAI(job.prompt);
 
     if (
       !aiResult ||
@@ -71,7 +88,7 @@ export async function processJob(jobId: string, attempt: number) {
     // Record failed counter metric
     jobsProcessedCounter.inc({ status: "failed" });
 
-    const isRetryable = job.attempts < env.MAX_JOB_ATTEMPTS;
+    const isRetryable = job.attempts < maxAttempts;
     const errorMessage = error instanceof Error ? error.message : "Unknown AI Processing Error";
 
     if (isRetryable) {
@@ -95,3 +112,16 @@ export async function processJob(jobId: string, attempt: number) {
 
 export class RetryableError extends Error {}
 export class FatalError extends Error {}
+
+/**
+ * The job is owned by another worker's lease. This is contention, not a
+ * failure, and must not spend the job's retry budget: when a worker crashes
+ * mid-job its lease outlives the entire retry schedule, so counting these
+ * redeliveries used to dead-letter the message while the job sat in
+ * PROCESSING — permanently, with nothing left to finish it.
+ */
+export class LeaseHeldError extends RetryableError {
+  constructor(message: string, readonly retryAfterMs: number) {
+    super(message);
+  }
+}

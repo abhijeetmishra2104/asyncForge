@@ -3,12 +3,12 @@ kind: Deployment
 metadata:
   name: asyncforge-dispatcher
 spec:
-  # Still exactly 1: two dispatchers would publish the same outbox event twice.
+  # One replica is a cost choice, not a correctness requirement. Dispatchers
+  # claim the events they publish, so several can poll the same outbox without
+  # publishing anything twice — tests/outbox.test.ts runs three side by side.
   #
-  # replicas: 1 alone does not guarantee that. The default RollingUpdate
-  # strategy surges an extra pod (maxSurge 25% rounds up to 1), so every
-  # deploy briefly runs two dispatchers polling the same outbox. Recreate is
-  # what actually enforces the invariant the line above claims.
+  # Recreate is kept only because a surge pod may not fit: the trial project's
+  # PREEMPTIBLE_CPUS quota is 0, so no extra Spot node can be created for it.
   strategy:
     type: Recreate
     rollingUpdate: null

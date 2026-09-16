@@ -1,4 +1,6 @@
+import { hostname } from "node:os";
 import { prisma } from "../lib/prisma";
+import type { ConfirmChannel } from "amqplib";
 import {
   getConfirmChannel,
   invalidateRabbitMQConnection,
@@ -38,33 +40,72 @@ export async function startDispatcher() {
   }
 }
 
-async function processOutboxBatch() {
+/**
+ * What a dispatcher reaches outside itself for. Production passes nothing and
+ * uses the shared confirm channel; tests pass their own channel so several
+ * dispatchers can run side by side in one process.
+ */
+export type DispatcherDeps = {
+  getChannel?: () => Promise<ConfirmChannel>;
+  batchSize?: number;
+  /** Recorded on claimed rows. Defaults to the pod name, so a stuck claim names its owner. */
+  dispatcherId?: string;
+  claimTimeoutMs?: number;
+};
+
+const DEFAULT_DISPATCHER_ID = `${hostname()}:${process.pid}`;
+
+type ClaimedEvent = {
+  id: string;
+  eventType: string;
+  payload: { jobId: string };
+  createdAt: Date;
+};
+
+export async function processOutboxBatch(deps: DispatcherDeps = {}) {
+  const getChannel = deps.getChannel ?? getConfirmChannel;
+  const batchSize = deps.batchSize ?? env.OUTBOX_BATCH_SIZE;
+  const dispatcherId = deps.dispatcherId ?? DEFAULT_DISPATCHER_ID;
+  const claimTimeoutMs = deps.claimTimeoutMs ?? env.OUTBOX_CLAIM_TIMEOUT_MS;
+
   const endPollTimer = outboxPollDurationHistogram.startTimer();
 
-  let batch: any[] = [];
+  let batch: ClaimedEvent[] = [];
 
   try {
-    batch = await prisma.$transaction(
-      async (tx) => {
-        const events: any[] = await tx.$queryRaw`
-          SELECT id, "aggregateId", "eventType", payload
-          FROM "OutboxEvent"
-          WHERE status = 'PENDING'
-          ORDER BY "createdAt" ASC
-          LIMIT ${env.OUTBOX_BATCH_SIZE}
-          FOR UPDATE SKIP LOCKED
-        `;
-
-        return events;
-      },
-      {
-        maxWait: 5000,
-        timeout: 10000,
-      }
-    );
+    // Claim, don't just lock. This used to SELECT ... FOR UPDATE SKIP LOCKED in
+    // a transaction that committed the moment the rows came back, so the locks
+    // were gone before a single event was published. A second dispatcher
+    // polling during that window found the same rows still PENDING and
+    // published every one of them again.
+    //
+    // Now the claim is written in the same statement that finds the rows. It
+    // outlives the statement, so other dispatchers skip these events until they
+    // are PUBLISHED — or until the claim expires, which is how a batch held by
+    // a dispatcher that crashed gets picked up again.
+    batch = await prisma.$queryRaw<ClaimedEvent[]>`
+      UPDATE "OutboxEvent"
+      SET "claimedAt" = NOW(), "claimedBy" = ${dispatcherId}
+      WHERE id IN (
+        SELECT id
+        FROM "OutboxEvent"
+        WHERE status = 'PENDING'
+          AND (
+            "claimedAt" IS NULL
+            OR "claimedAt" < NOW() - (${claimTimeoutMs}::float8 * INTERVAL '1 millisecond')
+          )
+        ORDER BY "createdAt" ASC
+        LIMIT ${batchSize}
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING id, "eventType", payload, "createdAt"
+    `;
   } finally {
     endPollTimer();
   }
+
+  // UPDATE ... RETURNING does not preserve the subquery's order.
+  batch.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   outboxBatchSizeHistogram.observe(batch.length);
 
@@ -82,7 +123,7 @@ async function processOutboxBatch() {
     });
 
     try {
-      const channel = await getConfirmChannel();
+      const channel = await getChannel();
 
       await new Promise<void>((resolve, reject) => {
         channel.publish(
@@ -143,6 +184,10 @@ async function processOutboxBatch() {
             error instanceof Error
               ? error.message
               : "Publish failed",
+          // Give the event back rather than holding it until the claim expires,
+          // so the next poll retries as soon as the broker is reachable again.
+          claimedAt: null,
+          claimedBy: null,
         },
       });
     }
