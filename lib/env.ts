@@ -12,6 +12,9 @@ const envSchema = z.object({
   MAX_JOB_ATTEMPTS: z.coerce.number().default(3),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().default(1000),
   OUTBOX_BATCH_SIZE: z.coerce.number().default(20),
+  // How long a dispatcher owns a claimed batch. Must comfortably exceed the
+  // time to publish one batch; a claim older than this is presumed abandoned.
+  OUTBOX_CLAIM_TIMEOUT_MS: z.coerce.number().default(30000),
   RABBITMQ_PREFETCH: z.coerce.number().default(1),
   // Quorum queues need a broker that allows them. Some managed shared brokers
   // (e.g. CloudAMQP's free tier) may reject them, so this is switchable

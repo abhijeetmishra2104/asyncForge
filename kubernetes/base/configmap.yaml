@@ -17,6 +17,9 @@ data:
   # Outbox Pattern Configuration
   OUTBOX_POLL_INTERVAL_MS: "1000"
   OUTBOX_BATCH_SIZE: "20"
+  # A claimed batch older than this belongs to a dispatcher that died mid-batch
+  # and may be claimed again. Must comfortably exceed one batch's publish time.
+  OUTBOX_CLAIM_TIMEOUT_MS: "30000"
   
   # Retry & Job Configuration
   MAX_JOB_ATTEMPTS: "3"

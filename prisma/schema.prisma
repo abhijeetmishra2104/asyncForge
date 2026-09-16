@@ -79,5 +79,12 @@ model OutboxEvent {
   publishedAt     DateTime?
   lastError       String?
 
+  /// Set when a dispatcher takes the event to publish, cleared if publishing
+  /// fails. A claim older than OUTBOX_CLAIM_TIMEOUT_MS belongs to a dispatcher
+  /// that died mid-batch, and the event may be claimed again.
+  claimedAt       DateTime?
+  /// Which dispatcher holds the claim (its pod name). For debugging only.
+  claimedBy       String?
+
   @@index([status, createdAt])
 }

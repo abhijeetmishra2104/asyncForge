@@ -5,7 +5,7 @@ metadata:
   labels:
     app: dispatcher
 spec:
-  replicas: 1 # MUST BE 1 to avoid duplicate message publishing
+  replicas: 1 # Safe to scale: dispatchers claim events, so two never publish the same one
   selector:
     matchLabels:
       app: dispatcher
