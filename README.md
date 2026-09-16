@@ -793,6 +793,68 @@ become temporarily unavailable.
 
 ------------------------------------------------------------------------
 
+# ✅ Proven by Tests
+
+Every reliability claim in this README has a test that fails if the claim
+stops being true. The suite runs against **real PostgreSQL and real RabbitMQ**
+in throwaway containers ([Testcontainers](https://testcontainers.com)) — only
+Gemini is faked — so row locks, redelivery and dead-lettering behave exactly
+as they do in production. CI runs it on every pull request, and nothing
+deploys unless it passes.
+
+``` bash
+pnpm test        # needs Docker running · ~45s
+```
+
+| Claim | Proven by |
+|---|---|
+| The API answers `202` without waiting on RabbitMQ | `api` › answers without touching RabbitMQ |
+| The Job and its OutboxEvent are written in one transaction | `api` › accepts a task with 202 and writes the Job and its OutboxEvent together |
+| Several dispatchers never publish the same event twice | `outbox` › 3 dispatchers running side by side publish 100 events exactly once |
+| A dispatcher that dies mid-batch doesn't strand its events | `outbox` › recovers a batch claimed by a dispatcher that died mid-publish |
+| A broker outage delays tasks but loses none | `outbox` › keeps events PENDING while the broker is down, then publishes them once it is back |
+| A duplicate delivery never calls Gemini twice | `worker` › calls Gemini once even when two workers receive duplicate copies of a task |
+| Transient failures are retried with backoff | `worker` › retries a transient Gemini failure with backoff and completes on a later attempt |
+| Exhausted retries end in `FAILED` plus the dead-letter queue | `worker` › marks a job FAILED and dead-letters it once retries are exhausted |
+| A crashed worker's job is finished by another worker | `worker` › finishes a job on another worker when its worker crashes mid-flight |
+| Killing a worker during a burst loses nothing | `pipeline` › loses no task when a worker is killed in the middle of a burst |
+| A request makes it through every component and back | `pipeline` › takes a task from HTTP through the outbox, dispatcher, RabbitMQ and a worker, back to the status API |
+| Workers scale horizontally | `scaling` › 4 workers drain a 24-job backlog at least 2.5x faster than 1 worker |
+| Scaling out mid-backlog helps immediately | `scaling` › a worker added mid-backlog starts taking jobs straight away |
+
+Scaling, measured with a simulated 250ms Gemini call per job:
+
+| Workers | 24 jobs drained in | Throughput |
+|---|---|---|
+| 1 | 6.47s | 3.7 jobs/s |
+| 4 | 1.63s | 14.7 jobs/s — **3.97x**, split 6 / 6 / 6 / 6 |
+
+## 🐛 What the tests caught
+
+Writing these tests against the existing code turned up three real bugs. Each
+regression test was run and seen **failing** before its fix went in.
+
+- **Duplicate publishing.** The dispatcher selected events with
+  `FOR UPDATE SKIP LOCKED` inside a transaction that committed as soon as the
+  rows came back — releasing the locks before anything was published. A second
+  dispatcher polling a moment later found the same rows still `PENDING`. Two
+  overlapping dispatchers produced **18 duplicate tasks out of 20**; three
+  produced 70 out of 100. Events are now claimed in the same statement that
+  finds them, and a claim expires so a dead dispatcher's batch is picked up
+  again.
+- **Jobs stranded by a worker crash.** A redelivery that found the job still
+  leased by the dead worker was counted as a failed attempt. The 5-minute lease
+  outlived the ~35-second retry schedule, so the message was dead-lettered
+  while the job sat in `PROCESSING` forever. Waiting on another worker's lease
+  no longer spends a retry.
+- **Unbounded retry queues.** Each retry's random jitter ended up in the name
+  of its TTL queue, so nearly every retry created a queue that was never
+  deleted. On CloudAMQP's free tier — capped at 100 queues — that eventually
+  makes retries impossible. Delays now come from a fixed ladder with three
+  jitter variants per step, so the queue count is bounded.
+
+------------------------------------------------------------------------
+
 # 📊 Observability & Monitoring
 
 Building a distributed system without visibility quickly becomes difficult. Once AsyncForge was running reliably, production-grade observability was added using **Prometheus** and **Grafana**.
