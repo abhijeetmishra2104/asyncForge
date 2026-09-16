@@ -28,3 +28,7 @@ jobs:
           GEMINI_API_KEY: dummy
           DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
           RABBITMQ_URL: amqp://localhost
+      # Starts real Postgres and RabbitMQ containers (Testcontainers) and runs
+      # the reliability suite against them: outbox, crash recovery, retries,
+      # dead-lettering, scaling. Deploys only happen after this passes.
+      - run: pnpm test
