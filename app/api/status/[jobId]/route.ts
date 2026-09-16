@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { authenticateDevice } from "@/lib/auth";
+import { MAX_JOB_ATTEMPTS } from "@/lib/api-limits";
 
 export async function GET(req: NextRequest, { params }: { params: { jobId: string } }) {
   try {
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest, { params }: { params: { jobId: strin
         attempts: true,
         createdAt: true,
         startedAt: true,
+        completedAt: true,
       },
     });
 
@@ -32,7 +34,9 @@ export async function GET(req: NextRequest, { params }: { params: { jobId: strin
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    return NextResponse.json(job, { status: 200 });
+    // maxAttempts lets the client render "Attempt 2 of 3" while a job is
+    // being retried, instead of a bare number with no ceiling to read it against.
+    return NextResponse.json({ ...job, maxAttempts: MAX_JOB_ATTEMPTS }, { status: 200 });
   } catch (error) {
     console.error("[API Status] Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
