@@ -9,9 +9,21 @@ data:
   # ceiling so a burst of visitors cannot exhaust the quota for everyone else.
   ANALYZE_RATE_LIMIT: "3"
   DEVICE_REGISTER_RATE_LIMIT: "5"
-  GLOBAL_ANALYZE_LIMIT: "150"
+  # Sized for a small prepaid balance rather than a daily free tier: on Opus 5
+  # each job costs roughly two cents, so 40 a day keeps a $1 credit alive for
+  # weeks. Raise it once the account has real budget.
+  GLOBAL_ANALYZE_LIMIT: "40"
 
   # AI Model Configuration
+  # Switching provider is a config change: set this to "gemini" and the worker
+  # uses GEMINI_API_KEY instead. Both return the same validated shape.
+  AI_PROVIDER: "claude"
+  # Cheapest Claude model: $1/$5 per million tokens against Opus 5's $5/$25,
+  # which is roughly half a cent per job here rather than two cents.
+  ANTHROPIC_MODEL: "claude-haiku-4-5"
+  # ANTHROPIC_EFFORT is deliberately unset: Haiku 4.5 returns a 400 if the
+  # effort parameter is present at all. Set it to "low" only alongside a model
+  # that accepts it, such as claude-opus-5 or claude-sonnet-5.
   GEMINI_MODEL: "gemini-3.6-flash"
   
   # RabbitMQ Configuration

@@ -7,7 +7,17 @@ config();
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   RABBITMQ_URL: z.string().url(),
-  GEMINI_API_KEY: z.string().min(1),
+  // Which model provider runs. Switching is a config change, not a code change.
+  AI_PROVIDER: z.enum(["claude", "gemini"]).default("claude"),
+  // Each key is required only when its provider is the active one — enforced
+  // below, so a Claude deployment needs no Gemini key and vice versa.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_MODEL: z.string().default("claude-haiku-4-5"),
+  // Optional on purpose: effort is only accepted by some models. Opus 4.5+ and
+  // Sonnet 5 take it; Haiku 4.5 returns a 400 if it is sent at all. Leave unset
+  // for Haiku, set "low" when running a model that supports it.
+  ANTHROPIC_EFFORT: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
+  GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default("gemini-3.6-flash"),
   MAX_JOB_ATTEMPTS: z.coerce.number().default(3),
   OUTBOX_POLL_INTERVAL_MS: z.coerce.number().default(1000),
@@ -38,7 +48,20 @@ const envSchema = z.object({
   DISPATCHER_HEALTH_PORT: z.coerce.number().default(8082),
 });
 
-const _env = envSchema.safeParse(process.env);
+const withProviderKey = envSchema.superRefine((value, ctx) => {
+  const required =
+    value.AI_PROVIDER === "claude" ? "ANTHROPIC_API_KEY" : "GEMINI_API_KEY";
+
+  if (!value[required]) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [required],
+      message: `${required} is required when AI_PROVIDER is "${value.AI_PROVIDER}".`,
+    });
+  }
+});
+
+const _env = withProviderKey.safeParse(process.env);
 
 if (!_env.success) {
   console.error("❌ Invalid environment variables:", _env.error.format());

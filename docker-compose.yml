@@ -59,6 +59,8 @@ services:
     environment:
       DATABASE_URL: postgresql://asyncforge:password@postgres:5432/asyncforge
       RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
+      AI_PROVIDER: ${AI_PROVIDER:-claude}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       migrate:
@@ -71,6 +73,8 @@ services:
     environment:
       DATABASE_URL: postgresql://asyncforge:password@postgres:5432/asyncforge
       RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
+      AI_PROVIDER: ${AI_PROVIDER:-claude}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       rabbitmq:
@@ -85,6 +89,8 @@ services:
     environment:
       DATABASE_URL: postgresql://asyncforge:password@postgres:5432/asyncforge
       RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
+      AI_PROVIDER: ${AI_PROVIDER:-claude}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       rabbitmq:
