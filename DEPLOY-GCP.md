@@ -133,9 +133,20 @@ in-cluster broker, which this overlay doesn't deploy. Leave them unset.
 ## 5. Deploy
 
 Push to `main`, or run **Actions → Deploy to GKE → Run workflow**. The workflow
-builds the three images tagged with the commit SHA, pushes them, generates the
-Kubernetes Secret from the GitHub secrets, runs `prisma migrate deploy` as a
-Job, applies the overlay, and waits for the rollouts.
+builds the three images tagged with the commit SHA, pushes them, and generates
+the Kubernetes Secret from the GitHub secrets.
+
+It then applies the manifests in **two passes**, which matters:
+
+1. Namespace, ConfigMap and the `prisma-migrate` Job — then it waits for that
+   Job to complete.
+2. The Deployments and Service.
+
+Applying everything at once starts the new pods alongside the migration. On the
+deploy that added the outbox claim columns, the new dispatcher spent 13 seconds
+logging `column "claimedAt" does not exist` before the Job caught up. That was
+survivable only because the migration added columns; a rename or a drop in that
+window would have taken the old pods down with it.
 
 Find the app:
 
