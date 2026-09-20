@@ -45,3 +45,17 @@ output "web_static_ip" {
   description = "Point app.asyncforge.me at this. Pinned in patch-web-service.yaml."
   value       = google_compute_address.web.address
 }
+
+output "database_private_ip" {
+  description = "Private IP of the Cloud SQL instance. Reachable only from the VPC."
+  value       = google_sql_database_instance.postgres.private_ip_address
+}
+
+output "database_url" {
+  description = <<-EOT
+    Set this as the DATABASE_URL GitHub secret. connection_limit keeps three
+    services' Prisma pools inside the instance's 60 connections.
+  EOT
+  value       = "postgresql://asyncforge:${random_password.db.result}@${google_sql_database_instance.postgres.private_ip_address}:5432/asyncforge?connection_limit=5"
+  sensitive   = true
+}

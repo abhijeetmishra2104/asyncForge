@@ -1,6 +1,7 @@
 import { env } from "../lib/env";
 import { startHealthServer } from "../lib/health";
 import { startConsumer } from "./consumer";
+import { abortInFlightJobs } from "./processor";
 import { prisma } from "../lib/prisma";
 import {
   getChannel,
@@ -26,6 +27,11 @@ async function bootstrap() {
 
 async function gracefulShutdown() {
   console.log("[Worker] Graceful shutdown initiated...");
+
+  // Hand back whatever is in flight before the connection drops, so those jobs
+  // are redelivered immediately rather than waiting out their lease. Autopilot
+  // allows 25 seconds after a Spot reclaim notice.
+  abortInFlightJobs();
 
   if (healthServer !== null) {
   await new Promise<void>((resolve) => {

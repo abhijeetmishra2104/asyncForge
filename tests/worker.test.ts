@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "../lib/prisma";
 import { QUEUES } from "../lib/rabbitmq";
+import { abortInFlightJobs } from "../worker/processor";
 import {
   closeConnections,
   createQueuedJob,
@@ -106,6 +107,66 @@ describe("Workers", () => {
     expect(survivorAI.calls).toHaveLength(1);
     expect(job.attempts).toBe(2);
     expect(await readyCount(QUEUES.DLQ)).toBe(0);
+  });
+
+  it("times out a model call that never returns rather than holding the job forever", async () => {
+    // Production caps this at GEMINI_TIMEOUT_MS. Before it existed, a hung
+    // request held its worker slot and its lease until the pod was replaced —
+    // the slowest job on record ran 340 seconds.
+    const ai = fakeAI({ hangAfter: 0 });
+    await startWorker({ executeAI: ai, timeoutMs: 300 });
+    const { jobId } = await createQueuedJob();
+
+    const startedAt = Date.now();
+    await publishTask(jobId);
+    const job = await waitForJobStatus(jobId, "FAILED", 15_000);
+
+    expect(job.attempts).toBe(3);
+    expect(job.error).toContain("exceeded");
+    expect(Date.now() - startedAt).toBeLessThan(10_000);
+  });
+
+  it("hands a job back when the worker shuts down, without waiting out the lease", async () => {
+    // A Spot reclaim or a rollout stops a worker mid-job. If it simply
+    // disappears, nothing may touch that job until its lease expires. A
+    // shutting-down worker instead fails its work as retryable, which puts the
+    // job straight back to QUEUED.
+    const leaseMs = 30_000;
+    const { jobId } = await createQueuedJob();
+
+    const leaving = await startWorker({ executeAI: fakeAI({ hangAfter: 0 }), leaseMs });
+    await publishTask(jobId);
+    await waitFor(async () => (await getJob(jobId)).status === "PROCESSING");
+
+    const startedAt = Date.now();
+    abortInFlightJobs();
+    await leaving.stop();
+
+    const survivorAI = fakeAI();
+    await startWorker({ executeAI: survivorAI, leaseMs });
+
+    const job = await waitForJobStatus(jobId, "COMPLETED", 20_000);
+    expect(survivorAI.calls).toHaveLength(1);
+    // Far inside the 30s lease: the job was released, not waited out.
+    expect(Date.now() - startedAt).toBeLessThan(10_000);
+    expect(job.attempts).toBe(2);
+  });
+
+  it("runs several jobs at once on one worker when prefetch allows it", async () => {
+    // Jobs are almost entirely spent waiting on Gemini, so a single worker can
+    // hold several. At prefetch 1 these eight jobs would take 8 x 300ms.
+    const ai = fakeAI({ latencyMs: 300 });
+    await startWorker({ executeAI: ai, prefetch: 4 });
+
+    const jobs = [];
+    for (let i = 0; i < 8; i++) jobs.push(await createQueuedJob(`concurrent task ${i}`));
+    const startedAt = Date.now();
+    for (const { jobId } of jobs) await publishTask(jobId);
+    await waitForAllJobs(jobs.map((j) => j.jobId), "COMPLETED", 30_000);
+
+    const seconds = (Date.now() - startedAt) / 1000;
+    console.log(`8 jobs on 1 worker at prefetch 4: ${seconds.toFixed(2)}s`);
+    expect(seconds).toBeLessThan(1.6);
   });
 
   it("keeps the number of retry queues bounded however many retries happen", async () => {

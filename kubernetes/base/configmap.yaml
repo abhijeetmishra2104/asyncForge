@@ -8,7 +8,10 @@ data:
   GEMINI_MODEL: "gemini-3.6-flash"
   
   # RabbitMQ Configuration
-  RABBITMQ_PREFETCH: "1"
+  # Jobs are almost entirely spent waiting on Gemini, so one worker can hold
+  # several at once. At 1, a second task queued behind a 10s model call waits
+  # the full 10s before it even starts.
+  RABBITMQ_PREFETCH: "4"
   # Set to "classic" if your broker rejects quorum queues (some managed
   # shared brokers do). Changing this requires deleting the existing
   # asyncforge.tasks.process queue, since queue type is immutable.
@@ -25,7 +28,8 @@ data:
   MAX_JOB_ATTEMPTS: "3"
   RETRY_BASE_DELAY_MS: "5000"
   RETRY_MAX_DELAY_MS: "60000"
-  JOB_PROCESSING_TIMEOUT_MS: "300000"
+  JOB_PROCESSING_TIMEOUT_MS: "120000"
+  GEMINI_TIMEOUT_MS: "45000"
   
   # Health Server Configuration
   WORKER_HEALTH_PORT: "8081"

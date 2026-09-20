@@ -34,10 +34,14 @@ const POLL_CEILING_MS = 10 * 60 * 1000;
 /** Transient failures to tolerate before telling the user the connection is gone. */
 const FAILURES_BEFORE_GIVING_UP = 3;
 
-/** Poll hard while a job is young, then ease off — most finish in the first 30s. */
+/**
+ * Poll hard while a job is young, then ease off — most finish in the first 30s.
+ * The first window is 1s because a result that is ready is otherwise invisible
+ * for up to another full interval, which is pure added latency for the user.
+ */
 function pollDelay(elapsedMs: number): number {
-  if (elapsedMs < 30_000) return 2_000;
-  if (elapsedMs < 120_000) return 5_000;
+  if (elapsedMs < 30_000) return 1_000;
+  if (elapsedMs < 120_000) return 3_000;
   return 10_000;
 }
 
