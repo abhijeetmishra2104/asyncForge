@@ -1,5 +1,10 @@
 import { prisma } from "../lib/prisma";
-import { executeAITask, type AIResponse } from "../lib/gemini";
+import {
+  activeModel,
+  activeProvider,
+  executeAITask,
+  type AIResponse,
+} from "../lib/ai";
 import { env } from "../lib/env";
 import { jobsProcessedCounter, jobDurationHistogram } from "../lib/metrics";
 
@@ -94,7 +99,10 @@ export async function processJob(jobId: string, deps: ProcessDeps = {}) {
   console.log(`[Worker] Processing Job ${jobId} (Attempt ${job.attempts})`);
 
   // Start duration timer for job execution
-  const endTimer = jobDurationHistogram.startTimer({ model: env.GEMINI_MODEL });
+  const endTimer = jobDurationHistogram.startTimer({
+    provider: activeProvider,
+    model: activeModel,
+  });
 
   try {
     const aiResult = await withDeadline(executeAI(job.prompt), timeoutMs);

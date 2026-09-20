@@ -20,6 +20,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
     "@google/genai": "^2.17.1",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^6.16.2",

@@ -1,66 +1,36 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { env } from "./env";
+import { env } from "../env";
 import {
-  geminiRequestsCounter,
-  geminiRequestDurationHistogram,
-  geminiTokensCounter,
-} from "./metrics";
+  modelRequestsCounter,
+  modelRequestDurationHistogram,
+  modelTokensCounter,
+} from "../metrics";
+import {
+  ModelQuotaError,
+  ModelUnavailableError,
+  SYSTEM_PROMPT,
+  type AIResponse,
+} from "./types";
 
-const gemini = new GoogleGenAI({
-  apiKey: env.GEMINI_API_KEY,
-});
+const PROVIDER = "gemini";
 
-/**
- * The model is out of quota. Raw Gemini errors are JSON blobs mentioning
- * billing plans, which end up stored on the job and shown to whoever submitted
- * it — so they are translated into something a person can act on.
- */
-export class ModelQuotaError extends Error {}
+// Built on first use, so a worker running on Claude never needs a Gemini key.
+let gemini: GoogleGenAI | null = null;
 
-/** The model is temporarily unavailable or overloaded. Worth retrying. */
-export class ModelUnavailableError extends Error {}
-
-export type AIResponse = {
-  summary: string;
-  actionItems: {
-    title: string;
-    description: string;
-    priority: "HIGH" | "MEDIUM" | "LOW";
-  }[];
-  nextSteps: string[];
-};
-
-const SYSTEM_PROMPT = `
-You are an API.
-
-Return ONLY valid JSON.
-
-The response MUST exactly follow this schema:
-
-{
-  "summary": "string",
-  "actionItems": [
-    {
-      "title": "string",
-      "description": "string",
-      "priority": "HIGH"
+function getClient(): GoogleGenAI {
+  if (!gemini) {
+    if (!env.GEMINI_API_KEY) {
+      throw new Error("AI_PROVIDER is 'gemini' but GEMINI_API_KEY is not set.");
     }
-  ],
-  "nextSteps": [
-    "string"
-  ]
+    gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+  }
+  return gemini;
 }
 
-Rules:
-- Do NOT wrap the JSON inside markdown.
-- Do NOT use triple backticks.
-- Do NOT explain anything.
-- Return ONLY the JSON object.
-`;
 
 // Gemini enforces this server-side, so the model cannot return a different
-// shape. The SYSTEM_PROMPT above is kept as belt-and-braces documentation of
-// the contract the rest of the pipeline (and the mobile client) expects.
+// shape. The shared SYSTEM_PROMPT in ./types states the same contract in
+// words, for whichever provider is in use.
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -88,15 +58,14 @@ const RESPONSE_SCHEMA = {
   required: ["summary", "actionItems", "nextSteps"],
 };
 
-export async function executeAITask(
-  prompt: string
-): Promise<AIResponse> {
-  const endTimer = geminiRequestDurationHistogram.startTimer({
+export async function executeWithGemini(prompt: string): Promise<AIResponse> {
+  const endTimer = modelRequestDurationHistogram.startTimer({
+    provider: PROVIDER,
     model: env.GEMINI_MODEL,
   });
 
   try {
-    const completion = await gemini.models.generateContent({
+    const completion = await getClient().models.generateContent({
       model: env.GEMINI_MODEL,
       contents: prompt,
       config: {
@@ -107,7 +76,8 @@ export async function executeAITask(
       },
     });
 
-    geminiRequestsCounter.inc({
+    modelRequestsCounter.inc({
+      provider: PROVIDER,
       model: env.GEMINI_MODEL,
       status: "success",
     });
@@ -115,24 +85,27 @@ export async function executeAITask(
     const usage = completion.usageMetadata;
 
     if (usage) {
-      geminiTokensCounter.inc(
+      modelTokensCounter.inc(
         {
+          provider: PROVIDER,
           model: env.GEMINI_MODEL,
           type: "prompt",
         },
         usage.promptTokenCount ?? 0
       );
 
-      geminiTokensCounter.inc(
+      modelTokensCounter.inc(
         {
+          provider: PROVIDER,
           model: env.GEMINI_MODEL,
           type: "completion",
         },
         (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0)
       );
 
-      geminiTokensCounter.inc(
+      modelTokensCounter.inc(
         {
+          provider: PROVIDER,
           model: env.GEMINI_MODEL,
           type: "total",
         },
@@ -166,7 +139,8 @@ export async function executeAITask(
     // exhaustion comes back as 429 the same way the previous provider did.
     const httpStatus = error?.status;
 
-    geminiRequestsCounter.inc({
+    modelRequestsCounter.inc({
+      provider: PROVIDER,
       model: env.GEMINI_MODEL,
       status: httpStatus === 429 ? "rate_limited" : "error",
     });

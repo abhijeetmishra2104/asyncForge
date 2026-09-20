@@ -19,7 +19,7 @@ export const jobsProcessedCounter = new client.Counter({
 export const jobDurationHistogram = new client.Histogram({
   name: 'asyncforge_job_duration_seconds',
   help: 'Time taken to process an AI job end-to-end',
-  labelNames: ['model'],
+  labelNames: ['provider', 'model'],
   buckets: [0.5, 1, 2, 5, 10, 15, 30, 60], 
 });
 
@@ -53,23 +53,23 @@ export const outboxBatchSizeHistogram = new client.Histogram({
 // 5. GEMINI AI METRICS
 // ==========================================
 
-export const geminiRequestsCounter = new client.Counter({
-  name: 'asyncforge_gemini_requests_total',
+export const modelRequestsCounter = new client.Counter({
+  name: 'asyncforge_model_requests_total',
   help: 'Total requests made to the Gemini API',
-  labelNames: ['model', 'status'], // status: 'success', 'error', 'rate_limited'
+  labelNames: ['provider', 'model', 'status'], // status: 'success', 'error', 'rate_limited'
 });
 
-export const geminiRequestDurationHistogram = new client.Histogram({
-  name: 'asyncforge_gemini_request_duration_seconds',
+export const modelRequestDurationHistogram = new client.Histogram({
+  name: 'asyncforge_model_request_duration_seconds',
   help: 'Latency of Gemini API calls',
-  labelNames: ['model'],
+  labelNames: ['provider', 'model'],
   buckets: [0.1, 0.5, 1, 2, 5, 10, 20], 
 });
 
-export const geminiTokensCounter = new client.Counter({
-  name: 'asyncforge_gemini_tokens_total',
+export const modelTokensCounter = new client.Counter({
+  name: 'asyncforge_model_tokens_total',
   help: 'Token usage from Gemini API',
-  labelNames: ['model', 'type'], // type: 'prompt', 'completion', 'total'
+  labelNames: ['provider', 'model', 'type'], // type: 'prompt', 'completion', 'total'
 });
 
 // ==========================================

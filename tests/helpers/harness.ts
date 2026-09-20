@@ -1,7 +1,7 @@
 import amqp, { type ConfirmChannel } from "amqplib";
 import { inject } from "vitest";
 import { prisma } from "../../lib/prisma";
-import type { AIResponse } from "../../lib/gemini";
+import type { AIResponse } from "../../lib/ai";
 import { EXCHANGES, QUEUES, ROUTING_KEYS, setupTopology } from "../../lib/rabbitmq";
 import { startConsumer, type ConsumerDeps } from "../../worker/consumer";
 import { processOutboxBatch, type DispatcherDeps } from "../../dispatcher/publisher";

@@ -400,6 +400,7 @@ The deployment consists of:
 - 📤 Dispatcher
 - ⚙️ Worker Pool
 - 🐇 RabbitMQ StatefulSet
+- 🤖 Claude (Anthropic) or Gemini — switchable with one env var
 - 🐘 PostgreSQL (Cloud SQL in production, Docker locally)
 - 📈 Prometheus
 - 📊 Grafana

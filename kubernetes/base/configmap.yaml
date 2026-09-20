@@ -9,9 +9,16 @@ data:
   # ceiling so a burst of visitors cannot exhaust the quota for everyone else.
   ANALYZE_RATE_LIMIT: "3"
   DEVICE_REGISTER_RATE_LIMIT: "5"
-  GLOBAL_ANALYZE_LIMIT: "150"
+  # Sized for a small prepaid balance rather than a daily free tier: on Opus 5
+  # each job costs roughly two cents, so 40 a day keeps a $1 credit alive for
+  # weeks. Raise it once the account has real budget.
+  GLOBAL_ANALYZE_LIMIT: "40"
 
   # AI Model Configuration
+  # Switching provider is a config change: set this to "gemini" and the worker
+  # uses GEMINI_API_KEY instead. Both return the same validated shape.
+  AI_PROVIDER: "claude"
+  ANTHROPIC_MODEL: "claude-opus-5"
   GEMINI_MODEL: "gemini-3.6-flash"
   
   # RabbitMQ Configuration

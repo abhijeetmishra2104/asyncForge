@@ -25,6 +25,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm build
         env:
+          ANTHROPIC_API_KEY: dummy
           GEMINI_API_KEY: dummy
           DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
           RABBITMQ_URL: amqp://localhost
