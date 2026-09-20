@@ -45,11 +45,12 @@ export async function executeWithClaude(prompt: string): Promise<AIResponse> {
       max_tokens: 8000,
       system: SYSTEM_PROMPT,
       output_config: {
-        // Summarising a prompt is not hard work; low effort keeps latency and
-        // spend down. Thinking itself stays on — disabling it on Opus 5 can
-        // leak reasoning tags into the answer.
-        effort: "low",
         format: jsonSchemaOutputFormat(AI_RESPONSE_JSON_SCHEMA),
+        // Only sent when configured. Summarising a prompt is not hard work, so
+        // "low" is right on a model that supports effort — but Haiku 4.5
+        // rejects the parameter outright, so it must be absent there rather
+        // than set to any value.
+        ...(env.ANTHROPIC_EFFORT ? { effort: env.ANTHROPIC_EFFORT } : {}),
       },
       messages: [{ role: "user", content: prompt }],
     });

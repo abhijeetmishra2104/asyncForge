@@ -12,7 +12,11 @@ const envSchema = z.object({
   // Each key is required only when its provider is the active one — enforced
   // below, so a Claude deployment needs no Gemini key and vice versa.
   ANTHROPIC_API_KEY: z.string().optional(),
-  ANTHROPIC_MODEL: z.string().default("claude-opus-5"),
+  ANTHROPIC_MODEL: z.string().default("claude-haiku-4-5"),
+  // Optional on purpose: effort is only accepted by some models. Opus 4.5+ and
+  // Sonnet 5 take it; Haiku 4.5 returns a 400 if it is sent at all. Leave unset
+  // for Haiku, set "low" when running a model that supports it.
+  ANTHROPIC_EFFORT: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default("gemini-3.6-flash"),
   MAX_JOB_ATTEMPTS: z.coerce.number().default(3),

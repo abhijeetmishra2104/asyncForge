@@ -25,7 +25,7 @@ Object.assign(process.env, {
   // fake model means neither is ever used to make a call.
   AI_PROVIDER: "claude",
   ANTHROPIC_API_KEY: "test-key-never-sent",
-  ANTHROPIC_MODEL: "claude-opus-5",
+  ANTHROPIC_MODEL: "claude-haiku-4-5",
   GEMINI_API_KEY: "test-key-never-sent",
   GEMINI_MODEL: "fake-model",
   MAX_JOB_ATTEMPTS: "3",

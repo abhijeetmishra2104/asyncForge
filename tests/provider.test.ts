@@ -33,6 +33,6 @@ describe("Model provider contract", () => {
     const { activeProvider, activeModel } = await import("../lib/ai");
     // setup-env.ts sets AI_PROVIDER=claude for the suite.
     expect(activeProvider).toBe("claude");
-    expect(activeModel).toBe("claude-opus-5");
+    expect(activeModel).toBe("claude-haiku-4-5");
   });
 });
