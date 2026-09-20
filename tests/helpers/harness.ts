@@ -212,6 +212,8 @@ export function fakeAI(
     /** Fail the first call for each distinct prompt, then succeed for it. */
     failOncePerPrompt?: boolean;
     alwaysFail?: boolean;
+    /** HTTP status the simulated failure carries. 429 means rate limited. */
+    failStatus?: number;
     /** Calls after this many never resolve — the process is "stuck" in Gemini. */
     hangAfter?: number;
   } = {}
@@ -235,7 +237,8 @@ export function fakeAI(
     if (shouldFail) {
       failures += 1;
       failedPrompts.add(prompt);
-      throw Object.assign(new Error("503 Service Unavailable (fake)"), { status: 503 });
+      const status = opts.failStatus ?? 503;
+      throw Object.assign(new Error(`${status} from the fake model`), { status });
     }
     return {
       summary: `Result for: ${prompt}`,

@@ -137,7 +137,15 @@ export async function processJob(jobId: string, deps: ProcessDeps = {}) {
         where: { id: jobId },
         data: { status: "QUEUED", error: errorMessage, updatedAt: new Date() },
       });
-      throw new RetryableError("Temporary processing failure");
+
+      // A 429 means the quota is gone, not that the call glitched. Retrying in
+      // a second would only burn another attempt, so back off the full amount.
+      const rateLimited = (error as { status?: number } | null)?.status === 429;
+
+      throw new RetryableError(
+        "Temporary processing failure",
+        rateLimited ? env.RETRY_MAX_DELAY_MS : undefined
+      );
     } else {
       await prisma.job.update({
         where: { id: jobId },
@@ -151,7 +159,16 @@ export async function processJob(jobId: string, deps: ProcessDeps = {}) {
   }
 }
 
-export class RetryableError extends Error {}
+export class RetryableError extends Error {
+  /**
+   * How long to wait before this message comes back, when the failure itself
+   * implies a delay — being rate limited, or waiting on another worker's
+   * lease. Left unset for ordinary failures, which use the attempt ladder.
+   */
+  constructor(message: string, readonly retryAfterMs?: number) {
+    super(message);
+  }
+}
 export class FatalError extends Error {}
 
 /**
@@ -162,7 +179,11 @@ export class FatalError extends Error {}
  * PROCESSING — permanently, with nothing left to finish it.
  */
 export class LeaseHeldError extends RetryableError {
-  constructor(message: string, readonly retryAfterMs: number) {
-    super(message);
+  /** Always known for a lease: it is the time left on it. `declare` narrows
+   *  the optional field on RetryableError without redefining it. */
+  declare readonly retryAfterMs: number;
+
+  constructor(message: string, retryAfterMs: number) {
+    super(message, retryAfterMs);
   }
 }
