@@ -126,16 +126,56 @@ jobs:
             kubernetes/overlays/gcp/kustomization.yaml
           kubectl kustomize kubernetes/overlays/gcp | grep -E '^\s+image:'
 
+      # The migration must finish before any new pod starts, so the manifests
+      # are applied in two passes. Applying everything at once started the new
+      # pods alongside the migration: on the deploy that added the outbox claim
+      # columns, the dispatcher spent 13 seconds logging
+      # `column "claimedAt" does not exist` until the Job caught up. That was
+      # survivable because the migration only added columns. A rename or a drop
+      # in that window would not be.
+      - name: Split the manifests into migration and workloads
+        run: |
+          kubectl kustomize kubernetes/overlays/gcp > /tmp/rendered.yaml
+          python3 - <<'SPLIT'
+          import re
+
+          # Anything the migration Job itself needs, plus the Job: pass one.
+          FIRST = {"Namespace", "ConfigMap", "Secret", "Job"}
+
+          # kustomize only ever writes "---" at column 0; anything embedded in a
+          # block scalar is indented under its key. So splitting on it is safe,
+          # and avoids depending on PyYAML being present on the runner.
+          docs = [d for d in open("/tmp/rendered.yaml").read().split("\n---\n") if d.strip()]
+
+          def kind(doc):
+              found = re.search(r"^kind:\s*(\S+)", doc, re.M)
+              return found.group(1) if found else ""
+
+          groups = {
+              "migration": [d for d in docs if kind(d) in FIRST],
+              "workloads": [d for d in docs if kind(d) not in FIRST],
+          }
+          for name, group in groups.items():
+              open(f"/tmp/{name}.yaml", "w").write("\n---\n".join(group) + "\n")
+              print(f"{name}: {', '.join(sorted(kind(d) for d in group))}")
+
+          assert groups["migration"], "no migration Job in the rendered manifests"
+          assert groups["workloads"], "no workloads in the rendered manifests"
+          SPLIT
+
       # A Job's pod template is immutable, so re-applying one with a new image
       # tag is rejected. Delete it first and let the apply recreate it.
       - name: Reset the migration Job
         run: kubectl delete job prisma-migrate -n asyncforge --ignore-not-found --wait=true
 
-      - name: Apply manifests
-        run: kubectl apply -k kubernetes/overlays/gcp
+      - name: Migrate the database
+        run: |
+          kubectl apply -f /tmp/migration.yaml
+          kubectl wait --for=condition=complete job/prisma-migrate -n asyncforge --timeout=5m
 
-      - name: Wait for the database migration
-        run: kubectl wait --for=condition=complete job/prisma-migrate -n asyncforge --timeout=5m
+      # Only now do the new pods start, against a schema that is already current.
+      - name: Apply the workloads
+        run: kubectl apply -f /tmp/workloads.yaml
 
       - name: Wait for rollouts
         run: |
