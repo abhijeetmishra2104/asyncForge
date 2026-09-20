@@ -400,7 +400,7 @@ The deployment consists of:
 - 📤 Dispatcher
 - ⚙️ Worker Pool
 - 🐇 RabbitMQ StatefulSet
-- 🐘 PostgreSQL (Neon)
+- 🐘 PostgreSQL (Cloud SQL in production, Docker locally)
 - 📈 Prometheus
 - 📊 Grafana
 - 🔐 Kubernetes Secrets
@@ -469,7 +469,7 @@ Using Kubernetes allowed AsyncForge to move from a local proof-of-concept to a c
 ### Running it on GCP
 
 The same manifests run on GKE Autopilot through `kubernetes/overlays/gcp`: the
-three stateless workloads in-cluster at 1 replica each, with Postgres on Neon
+three stateless workloads in-cluster at 1 replica each, with Postgres on Cloud SQL
 and RabbitMQ on CloudAMQP rather than stateful pods on preemptible nodes. The
 cluster and the keyless GitHub Actions trust are defined in `terraform/`, and
 `.github/workflows/deploy.yml` builds, migrates, and rolls out on every green

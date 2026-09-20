@@ -4,7 +4,8 @@
 
 One GKE Autopilot cluster in `asia-south1` running the three stateless app
 workloads at 1 replica each. Everything stateful is a managed free tier:
-Postgres on Neon, RabbitMQ on CloudAMQP. Images live in Artifact Registry, and
+Postgres on Cloud SQL in the same region, RabbitMQ on CloudAMQP. Images live
+in Artifact Registry, and
 GitHub Actions deploys on every green build of `main` with no service-account
 key anywhere.
 
@@ -15,7 +16,7 @@ git push main → CI (typecheck/lint/build) → Deploy to GKE
                                               └── kubectl apply -k overlays/gcp
 
   in-cluster:  web ×1    dispatcher ×1    worker ×1
-  managed:     Neon (Postgres)    CloudAMQP (RabbitMQ)
+  managed:     Cloud SQL (Postgres, same region)    CloudAMQP (RabbitMQ)
 ```
 
 `overlays/local` is untouched — kind still runs the full stack including the
@@ -53,7 +54,12 @@ with alerts at 50/90/100%. The credit does not hard-stop spending on its own.
 
 ## 2. Managed dependencies
 
-**Postgres** — you already have Neon. Nothing to do.
+**Postgres** — Terraform creates a Cloud SQL instance in `asia-south1`, the
+same region as the cluster, with a private IP reachable only from the VPC.
+
+This used to be Neon in `us-east-1`, which cost 263ms per query from a Mumbai
+pod. Accepting one task makes six round trips, so the `202` took 1,580ms. In
+region it is ~2ms and the same response takes ~53ms.
 
 **RabbitMQ** — create a free "Little Lemur" instance at
 [cloudamqp.com](https://www.cloudamqp.com/plans.html), region as close to
@@ -123,7 +129,7 @@ Secrets:
 |---|---|
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | from `terraform output` |
 | `GCP_SERVICE_ACCOUNT` | from `terraform output` |
-| `DATABASE_URL` | your Neon connection string |
+| `DATABASE_URL` | from `terraform output database_url` |
 | `RABBITMQ_URL` | your CloudAMQP `amqps://` URL |
 | `GEMINI_API_KEY` | your Gemini key |
 
@@ -262,7 +268,8 @@ Rough monthly figures for `asia-south1`; treat them as ±20%.
 | Pods: 1.0 vCPU + 2 GiB, all Spot | ~$19 |
 | Load balancer forwarding rule | ~$18 |
 | Artifact Registry + egress | ~$2 |
-| Neon + CloudAMQP | $0 (free tiers) |
+| Cloud SQL (db-f1-micro + 10GB) | ~$10 |
+| CloudAMQP | $0 (free tier) |
 | **Total** | **~$39/mo → ~$117 for the full 90 days** |
 
 Two levers if you want it cheaper still:
@@ -282,7 +289,8 @@ Two levers if you want it cheaper still:
   deploy workflow. Artifact Registry, IAM and the WIF trust all survive, so
   nothing needs reconfiguring.
 
-**What would blow the budget:** Cloud SQL (~$25/mo minimum — hence Neon), a
+**What would blow the budget:** a larger Cloud SQL tier (Enterprise Plus
+starts far above db-f1-micro), a
 second cluster (the free tier covers one), a regional Standard cluster, and
 GCE Ingress with Cloud Armor.
 
@@ -301,7 +309,8 @@ matches `owner/name`, and that the workflow has `permissions: id-token: write`.
 
 **Migration Job fails** — almost always `DATABASE_URL`. Check the logs the
 failure step dumped, or run `kubectl logs job/prisma-migrate -n asyncforge`.
-Neon needs `?sslmode=require` on the connection string.
+Note that `connection_limit` is a Prisma setting: `psql` rejects it, so strip
+it from the URL when connecting by hand.
 
 **`ImagePullBackOff`** — the node service account cannot read the registry.
 `terraform apply` again; the `nodes_can_pull` IAM binding grants it.

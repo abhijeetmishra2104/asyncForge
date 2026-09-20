@@ -1,7 +1,28 @@
 version: '3.8'
 
 services:
-  # The postgres service has been completely removed
+  # Local development runs its own Postgres. It used to borrow the hosted one,
+  # which meant `docker compose up` wrote to the same database as the deployed
+  # app, and left local work dependent on a cloud account staying alive.
+  # Production now runs on Cloud SQL, which is private to the cluster and not
+  # reachable from a laptop by design.
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: asyncforge
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: asyncforge
+    ports:
+      # 5433 on the host: 5432 is often already taken by another project's
+      # Postgres. Inside the compose network the port is still 5432.
+      - "5433:5432"
+    volumes:
+      - pgdata16:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asyncforge -d asyncforge"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   rabbitmq:
     image: rabbitmq:management-alpine
@@ -23,16 +44,20 @@ services:
     build: .
     command: pnpm db:deploy
     environment:
-      # Now dynamically reads from your .env file
-      DATABASE_URL: ${DATABASE_URL}
-    # Removed postgres from depends_on
+      # Hardcoded on purpose. Compose also reads .env, so ${DATABASE_URL}
+      # would pull in whatever the host uses — and a localhost URL does not
+      # resolve inside a container anyway.
+      DATABASE_URL: postgresql://asyncforge:password@postgres:5432/asyncforge
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   web:
     build: .
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://asyncforge:password@postgres:5432/asyncforge
       RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
       GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
@@ -44,7 +69,7 @@ services:
       context: .
       dockerfile: Dockerfile.dispatcher
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://asyncforge:password@postgres:5432/asyncforge
       RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
       GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
@@ -58,7 +83,7 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql://asyncforge:password@postgres:5432/asyncforge
       RABBITMQ_URL: amqp://asyncforge:password@rabbitmq:5672
       GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
@@ -68,5 +93,8 @@ services:
         condition: service_completed_successfully
 
 volumes:
-  # Removed pgdata volume
+  # pgdata16, not pgdata: an older pgdata volume exists on this machine,
+  # initialised by Postgres 15, which 16 refuses to start against. The old
+  # one is left alone rather than deleted.
+  pgdata16:
   rmqdata:
