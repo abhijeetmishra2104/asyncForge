@@ -39,7 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-/docs*
+# The handbook in docs/ is deliberately untracked, but committed diagrams are
+# an exception: git cannot un-ignore a file inside an ignored directory, so the
+# rule has to exclude the contents rather than the directory itself.
+/docs/*
+!/docs/architecture.png
 
 # Real k8s Secret manifest — holds live credentials. Use secret.example.yaml as the template.
 kubernetes/secret/secret.yaml
