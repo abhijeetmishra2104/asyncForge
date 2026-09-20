@@ -130,8 +130,12 @@ async function handleMessage(channel: Channel, msg: ConsumeMessage, deps: Proces
       return;
     }
 
-    // Exponential backoff: base, 2×base, 4×base … with jitter, capped.
-    const delay = retryDelayMs(env.RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1));
+    // Exponential backoff: base, 2×base, 4×base … with jitter, capped. An
+    // error that knows its own wait — being rate limited — overrides the ladder.
+    const hinted = err instanceof RetryableError ? err.retryAfterMs : undefined;
+    const delay = retryDelayMs(
+      hinted ?? env.RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1)
+    );
 
     console.log(
       `[Worker] Attempt ${attempt} failed (${

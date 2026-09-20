@@ -65,12 +65,18 @@ describe("Workers", () => {
     await startWorker({ executeAI: ai });
     const { jobId } = await createQueuedJob();
 
+    const startedAt = Date.now();
     await publishTask(jobId);
     const job = await waitForJobStatus(jobId, "COMPLETED");
+    const elapsed = Date.now() - startedAt;
 
     expect(ai.calls).toHaveLength(3);
     expect(job.attempts).toBe(3);
     expect(await readyCount(QUEUES.DLQ)).toBe(0);
+    // Two retries off the bottom of the ladder (~100ms + ~200ms). The same
+    // shape in production is 1s + 2s, where it used to be 5s + 10s.
+    console.log(`two transient failures then success: ${elapsed}ms`);
+    expect(elapsed).toBeLessThan(1_500);
   });
 
   it("marks a job FAILED and dead-letters it once retries are exhausted", async () => {
@@ -107,6 +113,25 @@ describe("Workers", () => {
     expect(survivorAI.calls).toHaveLength(1);
     expect(job.attempts).toBe(2);
     expect(await readyCount(QUEUES.DLQ)).toBe(0);
+  });
+
+  it("waits out the full backoff when Gemini rate-limits, not the short one", async () => {
+    // A 503 clears in moments, so the ladder starts small: ~100ms here, 1s in
+    // production. A 429 means the quota is spent — retrying that fast would
+    // only burn another attempt — so it waits RETRY_MAX_DELAY_MS instead.
+    const throttled = fakeAI({ failFirst: 1, failStatus: 429 });
+    await startWorker({ executeAI: throttled });
+    const { jobId } = await createQueuedJob("recovers from rate limiting");
+
+    const startedAt = Date.now();
+    await publishTask(jobId);
+    const job = await waitForJobStatus(jobId, "COMPLETED");
+    const elapsed = Date.now() - startedAt;
+
+    console.log(`retry after a 429: ${elapsed}ms (RETRY_MAX_DELAY_MS is 800 in tests)`);
+    expect(throttled.calls).toHaveLength(2);
+    expect(job.attempts).toBe(2);
+    expect(elapsed).toBeGreaterThan(700);
   });
 
   it("times out a model call that never returns rather than holding the job forever", async () => {

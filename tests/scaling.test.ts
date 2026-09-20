@@ -83,8 +83,14 @@ describe("Horizontal scaling (competing consumers)", () => {
     const byNewWorkers = added.reduce((n, m) => n + m.calls.length, 0);
     console.log(`original worker: ${original.calls.length} jobs, added workers: ${byNewWorkers} jobs, ${seconds.toFixed(2)}s total`);
 
+    // The claim is that the new workers start pulling immediately, and this is
+    // what proves it: they took most of the remaining backlog.
     expect(byNewWorkers).toBeGreaterThanOrEqual(8);
-    // One worker alone would need 20 × 250ms = 5s.
-    expect(seconds).toBeLessThan(4);
+
+    // Wall-clock guard, deliberately loose. One worker alone could not beat
+    // 20 × 250ms = 5s however fast the machine is, so finishing inside that
+    // means the extra workers did real work — without making the test fail on
+    // a loaded laptop, which a tighter bound does.
+    expect(seconds).toBeLessThan(20 * (MODEL_LATENCY_MS / 1000));
   });
 });

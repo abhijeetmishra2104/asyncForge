@@ -20,7 +20,11 @@ const envSchema = z.object({
   // (e.g. CloudAMQP's free tier) may reject them, so this is switchable
   // without a code change.
   RABBITMQ_QUEUE_TYPE: z.enum(["quorum", "classic"]).default("quorum"),
-  RETRY_BASE_DELAY_MS: z.coerce.number().default(5000),
+  // First retry delay; each further attempt doubles it. Gemini's 503s are
+  // transient and usually clear immediately, so waiting 5s was mostly dead
+  // time: a job that failed twice spent 15s of its life in backoff alone.
+  // Rate limiting (429) is handled separately — see worker/processor.ts.
+  RETRY_BASE_DELAY_MS: z.coerce.number().default(1000),
   RETRY_MAX_DELAY_MS: z.coerce.number().default(60000),
   // Upper bound on a single model call. Without one, a hung request holds its
   // worker slot and its lease indefinitely: the slowest job on record took 340s.
