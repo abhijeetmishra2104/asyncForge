@@ -1,0 +1,32 @@
+# Google Managed Service for Prometheus scrapes these endpoints directly, so
+# the metrics reach Cloud Monitoring without running a Prometheus of our own.
+# The worker and dispatcher already serve /metrics on their health ports.
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: asyncforge-worker
+  labels:
+    app: worker
+spec:
+  selector:
+    matchLabels:
+      app: worker
+  endpoints:
+    - port: health
+      path: /metrics
+      interval: 30s
+---
+apiVersion: monitoring.googleapis.com/v1
+kind: PodMonitoring
+metadata:
+  name: asyncforge-dispatcher
+  labels:
+    app: dispatcher
+spec:
+  selector:
+    matchLabels:
+      app: dispatcher
+  endpoints:
+    - port: health
+      path: /metrics
+      interval: 30s

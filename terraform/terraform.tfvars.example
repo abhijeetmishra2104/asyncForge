@@ -2,6 +2,7 @@
 
 project_id        = "asyncforge-470000"
 github_repository = "abhijeetmishra2104/async-forge"
+alert_email       = "you@example.com"
 
 # Defaults, override if you want:
 # region        = "asia-south1"

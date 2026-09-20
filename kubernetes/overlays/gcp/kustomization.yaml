@@ -19,6 +19,8 @@ resources:
   - ../../web
   - ../../dispatcher
   - ../../worker
+  - ../../monitoring
+  - ../../autoscaling
 
   # --- Deliberately not deployed on GCP -----------------------------------
   # ../../rabbitmq
@@ -50,6 +52,15 @@ images:
     newTag: IMAGE_TAG
 
 patches:
+  # The base Deployment sets replicas: 3. Remove the field outright so that
+  # applying manifests never overrides what KEDA has decided.
+  - target:
+      kind: Deployment
+      name: asyncforge-worker
+    patch: |
+      - op: remove
+        path: /spec/replicas
+
   # Autopilot defaults to 0.5 vCPU / 2 GiB per *container* when requests are
   # omitted. Every workload below is pinned to the Autopilot minimum
   # (250m / 512Mi) unless it genuinely needs more.

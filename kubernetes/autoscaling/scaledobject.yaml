@@ -1,0 +1,41 @@
+# Scale workers on how much work is actually waiting, rather than on CPU —
+# which stays near idle because a job is almost entirely time spent waiting on
+# Gemini. Requires KEDA on the cluster; see DEPLOY-GCP.md.
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: rabbitmq-connection
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: asyncforge-secrets
+      key: RABBITMQ_URL
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: asyncforge-worker
+spec:
+  scaleTargetRef:
+    name: asyncforge-worker
+
+  # One worker always stays up, so a single task is picked up immediately
+  # rather than waiting for a scale-from-zero.
+  minReplicaCount: 1
+  maxReplicaCount: 5
+
+  pollingInterval: 15
+  # Wait this long after the backlog clears before scaling back down, so a
+  # bursty workload does not thrash.
+  cooldownPeriod: 120
+
+  triggers:
+    - type: rabbitmq
+      metadata:
+        protocol: auto
+        queueName: asyncforge.tasks.process
+        mode: QueueLength
+        # One replica per 5 waiting messages: 20 queued asks for 4 workers.
+        value: "5"
+      authenticationRef:
+        name: rabbitmq-connection

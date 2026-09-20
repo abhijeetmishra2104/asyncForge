@@ -13,17 +13,38 @@ spec:
     type: Recreate
     rollingUpdate: null
 
-  # 3 workers on Autopilot is 1.5 vCPU of billed request for an app that is
-  # idle most of the time. Scale up on demand:
-  #   kubectl scale deploy/asyncforge-worker -n asyncforge --replicas=3
-  replicas: 1
+  # No replicas field: KEDA owns the count (kubernetes/autoscaling), scaling on
+  # how many messages are waiting. Leaving it here would reset the worker count
+  # on every deploy — including in the middle of draining a backlog.
   template:
     spec:
+      # Prefer Spot, but do not require it. A nodeSelector is a hard
+      # constraint: with PREEMPTIBLE_CPUS quota at 0 on a trial project, no new
+      # Spot node can be created, so KEDA would scale to 5 and four pods would
+      # sit Pending forever — which is exactly what happened the first time.
+      # Preferred affinity keeps the cheap placement when Spot capacity exists
+      # and falls back to regular nodes when it does not.
+      #
       # A reclaimed worker is the failure this whole system was built to
       # survive: the RabbitMQ message is never ACKed, so another worker
       # picks the job back up.
-      nodeSelector:
-        cloud.google.com/gke-spot: "true"
+      # The toleration must be explicit. Autopilot adds it automatically for a
+      # gke-spot nodeSelector, but not for a preference — so dropping the
+      # selector alone locked workers out of the Spot node entirely.
+      tolerations:
+        - key: cloud.google.com/gke-spot
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: cloud.google.com/gke-spot
+                    operator: In
+                    values: ["true"]
       containers:
         - name: worker
           resources:
