@@ -13,12 +13,53 @@ export type ProcessDeps = {
   /** How long a PROCESSING job is owned by its worker before another may take it. */
   leaseMs?: number;
   maxAttempts?: number;
+  /** Upper bound on one model call. */
+  timeoutMs?: number;
 };
+
+/**
+ * Rejects the model calls currently in flight. Each one fails as a retryable
+ * error, so its job goes back to QUEUED and its message is redelivered at once.
+ *
+ * Without this, a worker that is shut down — a Spot reclaim, a rollout — leaves
+ * its jobs PROCESSING, and nothing else may touch them until the lease expires.
+ */
+const inFlight = new Set<(reason: Error) => void>();
+
+export function abortInFlightJobs() {
+  const interrupt = [...inFlight];
+  inFlight.clear();
+  for (const reject of interrupt) reject(new RetryableError("Worker is shutting down."));
+}
+
+/**
+ * Fails `work` if it outlives `timeoutMs`, or as soon as the worker is shutting
+ * down. The underlying HTTP request cannot be cancelled, so it may still finish
+ * in the background; by then this job has already taken the retry path.
+ */
+function withDeadline<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
+  let interrupt!: (reason: Error) => void;
+  const interrupted = new Promise<never>((_resolve, reject) => {
+    interrupt = reject;
+  });
+
+  const timer = setTimeout(
+    () => interrupt(new RetryableError(`Model call exceeded ${timeoutMs}ms.`)),
+    timeoutMs
+  );
+  inFlight.add(interrupt);
+
+  return Promise.race([work, interrupted]).finally(() => {
+    clearTimeout(timer);
+    inFlight.delete(interrupt);
+  });
+}
 
 export async function processJob(jobId: string, deps: ProcessDeps = {}) {
   const executeAI = deps.executeAI ?? executeAITask;
   const leaseMs = deps.leaseMs ?? env.JOB_PROCESSING_TIMEOUT_MS;
   const maxAttempts = deps.maxAttempts ?? env.MAX_JOB_ATTEMPTS;
+  const timeoutMs = deps.timeoutMs ?? env.GEMINI_TIMEOUT_MS;
 
   // Idempotent Job Acquisition: Only acquire if QUEUED or PROCESSING lease expired
   const lockAcquired = await prisma.$executeRaw`
@@ -56,7 +97,7 @@ export async function processJob(jobId: string, deps: ProcessDeps = {}) {
   const endTimer = jobDurationHistogram.startTimer({ model: env.GEMINI_MODEL });
 
   try {
-    const aiResult = await executeAI(job.prompt);
+    const aiResult = await withDeadline(executeAI(job.prompt), timeoutMs);
 
     if (
       !aiResult ||

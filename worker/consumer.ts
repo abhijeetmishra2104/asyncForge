@@ -144,8 +144,13 @@ async function handleMessage(channel: Channel, msg: ConsumeMessage, deps: Proces
   }
 }
 
-export async function startConsumer(channel: Channel, deps: ProcessDeps = {}) {
-  await channel.prefetch(env.RABBITMQ_PREFETCH);
+export type ConsumerDeps = ProcessDeps & {
+  /** How many messages this worker holds at once. Jobs are I/O-bound on Gemini. */
+  prefetch?: number;
+};
+
+export async function startConsumer(channel: Channel, deps: ConsumerDeps = {}) {
+  await channel.prefetch(deps.prefetch ?? env.RABBITMQ_PREFETCH);
 
   console.log(`[Worker] Listening on queue: ${QUEUES.PROCESS}`);
 

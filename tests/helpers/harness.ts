@@ -3,8 +3,7 @@ import { inject } from "vitest";
 import { prisma } from "../../lib/prisma";
 import type { AIResponse } from "../../lib/gemini";
 import { EXCHANGES, QUEUES, ROUTING_KEYS, setupTopology } from "../../lib/rabbitmq";
-import { startConsumer } from "../../worker/consumer";
-import type { ProcessDeps } from "../../worker/processor";
+import { startConsumer, type ConsumerDeps } from "../../worker/consumer";
 import { processOutboxBatch, type DispatcherDeps } from "../../dispatcher/publisher";
 
 type Connection = Awaited<ReturnType<typeof amqp.connect>>;
@@ -256,7 +255,7 @@ export function fakeAI(
  * Starts a real worker: its own AMQP connection, the production consumer, the
  * production processJob. Only the model and timings are injected.
  */
-export async function startWorker(deps: ProcessDeps = {}) {
+export async function startWorker(deps: ConsumerDeps = {}) {
   const connection = await openConnection();
   const channel = await connection.createChannel();
   channel.on("error", () => {});

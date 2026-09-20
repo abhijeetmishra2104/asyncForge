@@ -22,7 +22,14 @@ const envSchema = z.object({
   RABBITMQ_QUEUE_TYPE: z.enum(["quorum", "classic"]).default("quorum"),
   RETRY_BASE_DELAY_MS: z.coerce.number().default(5000),
   RETRY_MAX_DELAY_MS: z.coerce.number().default(60000),
-  JOB_PROCESSING_TIMEOUT_MS: z.coerce.number().default(300000),
+  // Upper bound on a single model call. Without one, a hung request holds its
+  // worker slot and its lease indefinitely: the slowest job on record took 340s.
+  GEMINI_TIMEOUT_MS: z.coerce.number().default(45000),
+  // How long a PROCESSING job stays owned by the worker that took it. Must
+  // exceed the longest a job can run (GEMINI_TIMEOUT_MS plus a little), or two
+  // workers could process the same job at once. Lower is better otherwise:
+  // it bounds how long a job waits after a worker dies without releasing it.
+  JOB_PROCESSING_TIMEOUT_MS: z.coerce.number().default(120000),
   WORKER_HEALTH_PORT: z.coerce.number().default(8081),
   DISPATCHER_HEALTH_PORT: z.coerce.number().default(8082),
 });
