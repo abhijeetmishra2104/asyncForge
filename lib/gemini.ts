@@ -10,6 +10,16 @@ const gemini = new GoogleGenAI({
   apiKey: env.GEMINI_API_KEY,
 });
 
+/**
+ * The model is out of quota. Raw Gemini errors are JSON blobs mentioning
+ * billing plans, which end up stored on the job and shown to whoever submitted
+ * it — so they are translated into something a person can act on.
+ */
+export class ModelQuotaError extends Error {}
+
+/** The model is temporarily unavailable or overloaded. Worth retrying. */
+export class ModelUnavailableError extends Error {}
+
 export type AIResponse = {
   summary: string;
   actionItems: {
@@ -154,13 +164,32 @@ export async function executeAITask(
   } catch (error: any) {
     // The Gemini SDK surfaces the HTTP status on ApiError.status; quota
     // exhaustion comes back as 429 the same way the previous provider did.
-    const status =
-      error?.status === 429 ? "rate_limited" : "error";
+    const httpStatus = error?.status;
 
     geminiRequestsCounter.inc({
       model: env.GEMINI_MODEL,
-      status,
+      status: httpStatus === 429 ? "rate_limited" : "error",
     });
+
+    // Keep `status` on the rethrown error: the worker reads it to decide how
+    // long to back off, and a 429 waits far longer than a transient failure.
+    if (httpStatus === 429) {
+      throw Object.assign(
+        new ModelQuotaError(
+          "The AI service is at capacity right now. Please try again in a few minutes."
+        ),
+        { status: httpStatus }
+      );
+    }
+
+    if (httpStatus === 503 || httpStatus === 500) {
+      throw Object.assign(
+        new ModelUnavailableError(
+          "The AI service is temporarily unavailable. This will be retried automatically."
+        ),
+        { status: httpStatus }
+      );
+    }
 
     throw error;
   } finally {

@@ -21,6 +21,18 @@ export const ANALYZE_LIMIT = positiveInt("ANALYZE_RATE_LIMIT", 20);
 export const ANALYZE_WINDOW_MS = positiveInt("ANALYZE_RATE_WINDOW_MS", HOUR_MS);
 
 /**
+ * A ceiling across everyone, not per device. The per-device limit is about
+ * fairness; this one protects the Gemini quota, which is shared and finite:
+ * a few keen visitors registering fresh devices would otherwise exhaust the
+ * day's budget and leave every later visitor staring at failures.
+ */
+export const GLOBAL_ANALYZE_LIMIT = positiveInt("GLOBAL_ANALYZE_LIMIT", 150);
+export const GLOBAL_ANALYZE_WINDOW_MS = positiveInt(
+  "GLOBAL_ANALYZE_WINDOW_MS",
+  24 * HOUR_MS
+);
+
+/**
  * Registrations allowed per client address per window. Without this, the
  * per-device limit above would be trivially bypassed by registering a fresh
  * device for every request.

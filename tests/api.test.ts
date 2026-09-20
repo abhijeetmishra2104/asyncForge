@@ -52,6 +52,24 @@ describe("HTTP API", () => {
     expect((await getStatus(stranger, body.jobId)).status).toBe(404);
   });
 
+  it("stops the whole demo once the shared daily ceiling is reached", async () => {
+    // Registering a fresh device must not buy more of the Gemini quota. Each
+    // device may submit 5; the shared ceiling is 25.
+    const statuses: number[] = [];
+    for (let device = 0; device < 6; device++) {
+      const token = await registerDevice();
+      for (let i = 0; i < 5; i++) {
+        statuses.push((await submitTask(token, `Device ${device}, task ${i}.`)).status);
+      }
+    }
+
+    expect(statuses.filter((s) => s === 202)).toHaveLength(25);
+
+    const refused = await submitTask(await registerDevice(), "A brand new device should not help.");
+    expect(refused.status).toBe(429);
+    expect(refused.body.error).toContain("daily limit");
+  });
+
   it("rate-limits a device that submits too many tasks", async () => {
     const token = await registerDevice();
     const statuses = [];
