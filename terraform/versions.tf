@@ -12,15 +12,14 @@ terraform {
     }
   }
 
-  # State lives on your laptop by default. To share it (or run Terraform from
-  # CI later), create a bucket and uncomment this block:
-  #
-  #   gsutil mb -l asia-south1 gs://asyncforge-tfstate-<something-unique>
-  #
-  # backend "gcs" {
-  #   bucket = "asyncforge-tfstate-<something-unique>"
-  #   prefix = "gke"
-  # }
+  # State lives in GCS, not on a laptop. It holds the Cloud SQL password and is
+  # the only record of what this project owns, so losing it means losing the
+  # ability to manage any of it. The bucket has object versioning on, which
+  # keeps every previous state as a recoverable generation.
+  backend "gcs" {
+    bucket = "asyncforge-tfstate-9ff918"
+    prefix = "gke"
+  }
 }
 
 provider "google" {

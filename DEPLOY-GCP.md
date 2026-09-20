@@ -258,6 +258,60 @@ default, so pod CPU, memory, restarts and logs are in the console for free. The
 Prometheus + Grafana dashboards still run on kind via `overlays/local`, which is
 where the screenshots in `docs/` came from.
 
+## Alerting
+
+Metrics were being collected by nobody: the Prometheus and Grafana manifests
+only run on kind. Google Managed Service for Prometheus now scrapes the worker
+and dispatcher `/metrics` endpoints directly
+(`kubernetes/monitoring/podmonitoring.yaml`), so there is no Prometheus to run
+and nothing extra to pay for beyond ingestion.
+
+Three alert policies, defined in `terraform/monitoring.tf`, all mailing
+`alert_email`:
+
+| Alert | Fires when | Catches |
+|---|---|---|
+| Jobs are failing | more than one failure a minute, for five minutes | Gemini quota, a bad deploy, the database |
+| Outbox is not draining | over 50 pending events for ten minutes | dispatcher down, or unable to reach the broker |
+| Containers are restarting | more than three restarts in ten minutes | crash loops and OOM kills, which the app's own metrics cannot report |
+
+An email channel may need confirming the first time — check for a mail from
+Google Cloud Monitoring.
+
+## Autoscaling on queue depth
+
+Workers scale on how much work is waiting, not on CPU — a job is almost
+entirely time spent waiting on Gemini, so CPU stays near idle no matter how
+long the queue is.
+
+**KEDA is a prerequisite and is not installed by the deploy workflow.** On a
+new cluster, install it once before the first deploy, or applying the overlay
+fails on the missing `ScaledObject` kind:
+
+``` bash
+kubectl apply --server-side -f https://github.com/kedacore/keda/releases/download/v2.20.2/keda-2.20.2.yaml
+kubectl wait --for=condition=available deploy --all -n keda --timeout=5m
+```
+
+`kubernetes/autoscaling/scaledobject.yaml` then scales `asyncforge-worker`
+between 1 and 5 replicas, targeting 5 queued messages per replica, reading the
+queue through the same `RABBITMQ_URL` the app uses.
+
+The worker Deployment deliberately carries **no** `replicas` field: KEDA owns
+the count, and leaving it in would reset the worker count on every deploy,
+including mid-backlog.
+
+Measured: a 1,000-message backlog took it from 1 replica to 5, and it returned
+to 1 about two minutes after the queue cleared.
+
+**Capacity is the real limit, not the autoscaler.** Workers *prefer* Spot but
+tolerate running anywhere, because a trial project has a `PREEMPTIBLE_CPUS`
+quota of **0** — no new Spot node can ever be created. With a hard
+`nodeSelector` instead, KEDA scales to 5 and four pods sit `Pending` forever.
+Beyond the two workers that fit on the existing nodes, scaling waits for
+Autopilot to add a regular node. Raising the `PREEMPTIBLE_CPUS` quota is the
+fix if you want to scale wide cheaply.
+
 ## Cost against the $300
 
 Rough monthly figures for `asia-south1`; treat them as ±20%.

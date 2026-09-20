@@ -25,3 +25,8 @@ variable "github_repository" {
   description = "GitHub repo allowed to deploy, as \"owner/name\". Only this repo can mint tokens for the deployer service account."
   type        = string
 }
+
+variable "alert_email" {
+  description = "Where alert notifications are sent."
+  type        = string
+}
