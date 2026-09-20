@@ -36,5 +36,8 @@ Object.assign(process.env, {
   OUTBOX_BATCH_SIZE: "20",
   OUTBOX_CLAIM_TIMEOUT_MS: "1500",
   ANALYZE_RATE_LIMIT: "5",
+  // Above the 20-task burst in pipeline.test.ts, so only the test that
+  // targets the ceiling actually reaches it.
+  GLOBAL_ANALYZE_LIMIT: "25",
   DEVICE_REGISTER_RATE_LIMIT: "1000",
 });

@@ -4,6 +4,13 @@ metadata:
   name: asyncforge-config
   namespace: asyncforge
 data:
+  # Public demo limits. The Gemini free tier is the binding constraint, so
+  # these are deliberately tight: per device for fairness, and a shared daily
+  # ceiling so a burst of visitors cannot exhaust the quota for everyone else.
+  ANALYZE_RATE_LIMIT: "3"
+  DEVICE_REGISTER_RATE_LIMIT: "5"
+  GLOBAL_ANALYZE_LIMIT: "150"
+
   # AI Model Configuration
   GEMINI_MODEL: "gemini-3.6-flash"
   

@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { authenticateDevice } from "@/lib/auth";
-import { ANALYZE_LIMIT, ANALYZE_WINDOW_MS } from "@/lib/api-limits";
+import {
+  ANALYZE_LIMIT,
+  ANALYZE_WINDOW_MS,
+  GLOBAL_ANALYZE_LIMIT,
+  GLOBAL_ANALYZE_WINDOW_MS,
+} from "@/lib/api-limits";
 import { consumeRateLimit, rateLimitHeaders } from "@/lib/rate-limit";
 
 const analyzeRequestSchema = z.object({
@@ -34,6 +39,30 @@ export async function POST(req: NextRequest) {
           headers: {
             ...rateLimitHeaders(limit),
             "Retry-After": String(limit.retryAfterSeconds),
+          },
+        }
+      );
+    }
+
+    // Then the shared ceiling. Checked after the per-device limit so that one
+    // busy client is told it is being throttled, rather than being told the
+    // whole service is busy.
+    const globalLimit = await consumeRateLimit(
+      "analyze:global",
+      GLOBAL_ANALYZE_LIMIT,
+      GLOBAL_ANALYZE_WINDOW_MS
+    );
+    if (!globalLimit.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            "This demo has hit its daily limit for AI requests. Try again tomorrow.",
+        },
+        {
+          status: 429,
+          headers: {
+            ...rateLimitHeaders(globalLimit),
+            "Retry-After": String(globalLimit.retryAfterSeconds),
           },
         }
       );
